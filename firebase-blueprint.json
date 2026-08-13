@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "UserFinancialItem": {
+      "path": "users/{userId}/items/{itemId}",
+      "description": "Financial record (Bank, Card, Loan, FD, Asset, Cash, Reminder)",
+      "fields": {
+        "userId": { "type": "string", "required": true },
+        "type": { "type": "string", "required": true },
+        "title": { "type": "string", "required": true },
+        "amount": { "type": "number", "required": true },
+        "subtitle": { "type": "string", "required": false },
+        "accountNumber": { "type": "string", "required": false },
+        "bankName": { "type": "string", "required": false },
+        "interestRate": { "type": "number", "required": false },
+        "maturityDate": { "type": "string", "required": false },
+        "assetCategory": { "type": "string", "required": false },
+        "purityOrUnits": { "type": "string", "required": false },
+        "creditLimit": { "type": "number", "required": false },
+        "dueDate": { "type": "string", "required": false },
+        "notes": { "type": "string", "required": false },
+        "createdAt": { "type": "string", "required": true },
+        "updatedAt": { "type": "string", "required": true }
+      }
+    },
+    "UserSettings": {
+      "path": "users/{userId}/settings/preferences",
+      "description": "User preferences and settings",
+      "fields": {
+        "currency": { "type": "string", "required": true },
+        "currencySymbol": { "type": "string", "required": true },
+        "theme": { "type": "string", "required": true },
+        "lastSynced": { "type": "string", "required": false }
+      }
+    }
+  }
+}
