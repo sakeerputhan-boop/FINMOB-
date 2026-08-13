@@ -30,10 +30,10 @@ import { SAMPLE_ITEMS } from './data/sampleData';
 import {
   auth,
   onAuthStateChanged,
+  signInAnonymously,
   subscribeToUserItems,
-  saveFinancialItem,
-  removeFinancialItem,
-  signInAnonymously
+  saveFinancialItem as saveFirestoreFinancialItem,
+  removeFinancialItem as removeFirestoreFinancialItem
 } from './lib/firebase';
 import { Plus } from 'lucide-react';
 
@@ -116,9 +116,9 @@ export default function App() {
           currentUser.uid,
           async (remoteItems) => {
             if (remoteItems.length === 0) {
-              // Seed sample items into Firestore if brand new user!
+              // Seed sample items into Firestore if brand new user
               for (const sample of SAMPLE_ITEMS) {
-                await saveFinancialItem(currentUser.uid, sample as any);
+                await saveFirestoreFinancialItem(currentUser.uid, sample as any);
               }
             } else {
               setItems(remoteItems);
@@ -131,7 +131,7 @@ export default function App() {
           }
         );
       } else {
-        // Sign in anonymously to enable seamless multi-device ready state out of the box
+        // Sign in anonymously to enable seamless cloud ready state
         try {
           await signInAnonymously(auth);
         } catch (e) {
@@ -139,7 +139,6 @@ export default function App() {
           setUser(null);
           setSyncState('guest');
           
-          // Load from localStorage
           const local = localStorage.getItem('finmob_local_items');
           if (local) {
             try {
@@ -167,10 +166,11 @@ export default function App() {
     if (user) {
       try {
         setSyncState('syncing');
-        await saveFinancialItem(user.uid, itemData);
+        await saveFirestoreFinancialItem(user.uid, itemData);
         setSyncState('synced');
       } catch (err) {
         console.error('Failed to save to Firestore:', err);
+        setSyncState('offline');
       }
     } else {
       // Local Storage Fallback
@@ -199,10 +199,11 @@ export default function App() {
     if (user) {
       try {
         setSyncState('syncing');
-        await removeFinancialItem(user.uid, id);
+        await removeFirestoreFinancialItem(user.uid, id);
         setSyncState('synced');
       } catch (err) {
         console.error('Failed to delete from Firestore:', err);
+        setSyncState('offline');
       }
     } else {
       const updated = items.filter((i) => i.id !== id);
