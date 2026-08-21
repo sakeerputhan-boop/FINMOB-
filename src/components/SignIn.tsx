@@ -119,6 +119,8 @@ export const SignIn: React.FC<SignInProps> = ({
         return 'Sign-in popup was closed before completing authentication.';
       case 'auth/network-request-failed':
         return 'Network connection error. Please verify your internet connection.';
+      case 'auth/unauthorized-domain':
+        return `Domain unauthorized: Please add "${window.location.hostname}" to Authorized Domains in Firebase Console > Authentication > Settings > Authorized domains.`;
       case 'auth/too-many-requests':
         return 'Too many attempts. Access is temporarily locked for security. Try again later.';
       case 'auth/operation-not-allowed':
