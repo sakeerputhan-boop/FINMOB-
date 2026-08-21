@@ -27,8 +27,8 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification?.title || payload.data?.title || 'MYFIN Financial Notification';
   const notificationOptions = {
     body: payload.notification?.body || payload.data?.body || 'You have a new financial alert or due date reminder.',
-    icon: payload.notification?.icon || '/icon-192.svg',
-    badge: '/icon-192.svg',
+    icon: payload.notification?.icon || '/icon.svg',
+    badge: '/icon.svg',
     tag: payload.data?.tag || 'myfin-push-alert',
     data: payload.data || {}
   };

@@ -104,14 +104,11 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* HD Logo & Brand: MYFIN */}
           <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 rounded-2xl overflow-hidden bg-slate-900 border border-slate-700/60 shadow-lg shadow-indigo-500/20 flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-2xl overflow-hidden bg-slate-900 border border-slate-700/60 shadow-lg shadow-emerald-500/20 flex items-center justify-center shrink-0">
               <img
-                src="/logo.jpg"
+                src="/icon.svg"
                 alt="MYFIN Logo"
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
-                }}
+                className="h-full w-full object-contain"
               />
             </div>
             <div>

@@ -52,12 +52,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl overflow-hidden bg-slate-950 border border-emerald-500/40 shadow-lg flex items-center justify-center">
                   <img
-                    src="/logo.png"
+                    src="/icon.svg"
                     alt="MYFIN Logo"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = '/logo.jpg';
-                    }}
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 <div>

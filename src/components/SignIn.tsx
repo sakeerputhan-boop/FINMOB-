@@ -330,12 +330,9 @@ export const SignIn: React.FC<SignInProps> = ({
             {/* High-Resolution MYFIN App Icon */}
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl overflow-hidden bg-slate-900 border border-slate-700/80 shadow-2xl flex items-center justify-center mx-auto">
               <img
-                src="/logo.png"
+                src="/icon.svg"
                 alt="MYFIN Logo"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = '/logo.jpg';
-                }}
+                className="w-full h-full object-contain"
               />
             </div>
           </div>

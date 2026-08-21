@@ -110,8 +110,8 @@ export function sendLocalDueNotification(alerts: DueAlertItem[]): void {
   try {
     new Notification(title, {
       body,
-      icon: '/icon-192.svg',
-      badge: '/icon-192.svg',
+      icon: '/icon.svg',
+      badge: '/icon.svg',
       tag: 'myfin-due-reminder'
     });
   } catch (e) {
