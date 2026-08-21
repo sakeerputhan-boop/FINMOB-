@@ -61,7 +61,7 @@ export const CreditSimulatorModal: React.FC<CreditSimulatorModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-extrabold text-white">
-                FINMOB Credit & Debt Simulator
+                MYFIN Credit & Debt Simulator
               </h2>
               <p className="text-xs text-slate-400">
                 Simulate credit score boost & interest savings

@@ -31,7 +31,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
           <span className="text-lg font-bold">✨</span>
         </div>
         <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
-          FINMOB Quick Actions
+          MYFIN Quick Actions
         </h2>
       </div>
 

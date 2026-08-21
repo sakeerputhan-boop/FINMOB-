@@ -9,7 +9,6 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
-  FileSpreadsheet,
   Share2,
   Sparkles,
   KeyRound
@@ -17,7 +16,6 @@ import {
 import { FinancialItem, CurrencyCode } from '../types';
 import { formatCurrency } from '../utils/currency';
 import { generateFinancialPdf } from '../utils/pdfGenerator';
-import finmobLogo from '../assets/images/finmob_app_logo_1786598798207.jpg';
 
 interface WhatsAppPdfModalProps {
   isOpen: boolean;
@@ -40,22 +38,21 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Categorize ALL entries
+  // Categorize entries (Excluding reminders from export)
   const bankItems = items.filter((i) => i.type === 'bank_account');
   const cashItems = items.filter((i) => i.type === 'cash_entry');
   const fdItems = items.filter((i) => i.type === 'fixed_deposit');
   const assetItems = items.filter((i) => i.type === 'asset');
   const cardItems = items.filter((i) => i.type === 'credit_card');
   const loanItems = items.filter((i) => i.type === 'emi_loan');
-  const reminderItems = items.filter((i) => i.type === 'reminder');
 
   const grossAssets = [...bankItems, ...cashItems, ...fdItems, ...assetItems].reduce((acc, i) => acc + i.amount, 0);
   const totalLiabilities = [...cardItems, ...loanItems].reduce((acc, i) => acc + i.amount, 0);
   const netWorth = grossAssets - totalLiabilities;
 
-  // Text report generator
+  // Text report generator (Without reminders)
   const generateReportText = () => {
-    let report = `📊 *FINMOB NET WORTH & COMPREHENSIVE STATEMENT*\n`;
+    let report = `📊 *MYFIN FINANCIAL & WEALTH STATEMENT*\n`;
     report += `📅 Date: ${new Date().toLocaleDateString()}\n`;
     if (password) {
       report += `🔒 *PDF Password*: ${password}\n`;
@@ -68,26 +65,26 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
     if (bankItems.length > 0 || cashItems.length > 0) {
       report += `🏦 *DAILY OPERATING ACCOUNTS*\n`;
       bankItems.forEach(b => {
-        report += `• Bank: ${b.title} - ${formatCurrency(b.amount, currency)}\n`;
+        report += `• Bank: ${b.title} (${b.country || 'UAE'}) - ${formatCurrency(b.amount, b.currency || currency)}\n`;
       });
       cashItems.forEach(c => {
-        report += `• Cash: ${c.title} - ${formatCurrency(c.amount, currency)}\n`;
+        report += `• Cash: ${c.title} (${c.country || 'UAE'}) - ${formatCurrency(c.amount, c.currency || currency)}\n`;
       });
       report += `\n`;
     }
 
     if (fdItems.length > 0) {
-      report += `🔒 *FIXED DEPOSITS (INDEPENDENT)*\n`;
+      report += `🔒 *FIXED DEPOSITS*\n`;
       fdItems.forEach(f => {
-        report += `• FD: ${f.title} - ${formatCurrency(f.amount, currency)} (${f.interestRate || 0}% p.a.)\n`;
+        report += `• FD: ${f.title} - ${formatCurrency(f.amount, f.currency || currency)} (${f.interestRate || 0}% p.a.)\n`;
       });
       report += `\n`;
     }
 
     if (assetItems.length > 0) {
-      report += `✨ *GOLD & INDEPENDENT ASSETS*\n`;
+      report += `✨ *GOLD & ASSETS*\n`;
       assetItems.forEach(a => {
-        report += `• Asset: ${a.title} (${a.purityOrUnits || 'Holdings'}) - ${formatCurrency(a.amount, currency)}\n`;
+        report += `• Asset: ${a.title} (${a.purityOrUnits || 'Holdings'}) - ${formatCurrency(a.amount, a.currency || currency)}\n`;
       });
       report += `\n`;
     }
@@ -95,24 +92,16 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
     if (cardItems.length > 0 || loanItems.length > 0) {
       report += `💳 *LIABILITIES & DEBTS*\n`;
       cardItems.forEach(card => {
-        report += `• Credit Card: ${card.title} - ${formatCurrency(card.amount, currency)}\n`;
+        report += `• Credit Card: ${card.title} - ${formatCurrency(card.amount, card.currency || currency)}\n`;
       });
       loanItems.forEach(loan => {
-        report += `• EMI Loan: ${loan.title} - ${formatCurrency(loan.amount, currency)}\n`;
-      });
-      report += `\n`;
-    }
-
-    if (reminderItems.length > 0) {
-      report += `📅 *BILL REMINDERS*\n`;
-      reminderItems.forEach(r => {
-        report += `• Due: ${r.title} - ${formatCurrency(r.amount, currency)}\n`;
+        report += `• ${loan.loanType === 'emi' ? 'EMI Loan' : 'Loan'}: ${loan.title} - ${formatCurrency(loan.amount, loan.currency || currency)}\n`;
       });
       report += `\n`;
     }
 
     report += `------------------------------------\n`;
-    report += `Generated securely via FINMOB PWA Real-time Wealth Tracker.`;
+    report += `Generated securely via MYFIN Real-time Multi-Country Wealth Tracker.`;
     return report;
   };
 
@@ -130,8 +119,8 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
       try {
         const doc = generateFinancialPdf({ items, currency, password });
         const fileName = password
-          ? `FINMOB_Protected_Statement_${new Date().toISOString().slice(0, 10)}.pdf`
-          : `FINMOB_Statement_${new Date().toISOString().slice(0, 10)}.pdf`;
+          ? `MYFIN_Protected_Statement_${new Date().toISOString().slice(0, 10)}.pdf`
+          : `MYFIN_Statement_${new Date().toISOString().slice(0, 10)}.pdf`;
         doc.save(fileName);
       } catch (err) {
         console.error('PDF Generation Error:', err);
@@ -147,15 +136,15 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
     try {
       const doc = generateFinancialPdf({ items, currency, password });
       const pdfBlob = doc.output('blob');
-      const fileName = password ? 'FINMOB_Protected_Statement.pdf' : 'FINMOB_Statement.pdf';
+      const fileName = password ? 'MYFIN_Protected_Statement.pdf' : 'MYFIN_Statement.pdf';
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
       // Check if Web Share API with files is supported (Mobile / PWA / Chrome)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: 'FINMOB Financial Statement',
-          text: `FINMOB Financial Statement (${password ? 'Password Protected: ' + password : 'Full Portfolio'})`
+          title: 'MYFIN Financial Statement',
+          text: `MYFIN Financial Statement (${password ? 'Password Protected: ' + password : 'Full Portfolio'})`
         });
         setShareSuccess(true);
         setTimeout(() => setShareSuccess(false), 3000);
@@ -163,7 +152,7 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
         // Fallback: Download PDF & open WhatsApp message share
         doc.save(fileName);
         const shareMsg = password
-          ? `📄 *FINMOB Encrypted Financial Statement*\n\n🔒 *Document Password*: \`${password}\`\n\nTotal Net Worth: *${formatCurrency(netWorth, currency)}*\n\nI have attached the encrypted PDF statement to this chat.`
+          ? `📄 *MYFIN Encrypted Financial Statement*\n\n🔒 *Document Password*: \`${password}\`\n\nTotal Net Worth: *${formatCurrency(netWorth, currency)}*\n\nI have attached the encrypted PDF statement to this chat.`
           : reportText;
 
         const encoded = encodeURIComponent(shareMsg);
@@ -186,22 +175,20 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
           <div className="flex items-center gap-3">
-            <img
-              src={finmobLogo}
-              alt="FINMOB App Logo"
-              className="w-10 h-10 rounded-xl object-cover border border-emerald-500/40 shadow-md"
-            />
+            <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center font-black text-lg">
+              M
+            </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-extrabold text-white">
                   WhatsApp PDF Statement & Sharing
                 </h2>
                 <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  All Entries
+                  Financial Records
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Generate encrypted password-protected PDF containing all bank, cash, FDs, assets, loans & card entries.
+                Generate encrypted password-protected PDF containing bank accounts, cash, FDs, assets, loans & credit cards.
               </p>
             </div>
           </div>
@@ -219,7 +206,7 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
           {/* Included Entries Summary Pills */}
           <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
             <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-300 uppercase tracking-wider">
-              <span>Included Entries in Statement ({items.length} Total)</span>
+              <span>Included Records in Statement</span>
               <span className="text-emerald-400">Net Worth: {formatCurrency(netWorth, currency)}</span>
             </div>
             <div className="flex flex-wrap gap-1.5 text-[10px] font-bold">
@@ -240,9 +227,6 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
               </span>
               <span className="px-2 py-0.5 rounded bg-slate-700/50 text-slate-300 border border-slate-600">
                 🏦 Loans ({loanItems.length})
-              </span>
-              <span className="px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                📅 Reminders ({reminderItems.length})
               </span>
             </div>
           </div>

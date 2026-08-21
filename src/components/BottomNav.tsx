@@ -2,23 +2,21 @@ import React from 'react';
 import {
   LayoutDashboard,
   Building2,
-  Banknote,
-  PiggyBank,
-  Coins,
   CreditCard,
   Building,
-  Bell
+  Coins,
+  Banknote,
+  Gift
 } from 'lucide-react';
 
 export type TabType =
   | 'dashboard'
   | 'accounts'
-  | 'cash'
-  | 'fds'
-  | 'gold'
   | 'cards'
   | 'loans'
-  | 'reminders';
+  | 'assets'
+  | 'cash'
+  | 'gifts';
 
 interface BottomNavProps {
   activeTab: TabType;
@@ -32,12 +30,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   const tabs: { id: TabType; label: string; icon: React.ComponentType<any> }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'accounts', label: 'Accounts', icon: Building2 },
-    { id: 'cash', label: 'Cash', icon: Banknote },
-    { id: 'fds', label: 'FDs', icon: PiggyBank },
-    { id: 'gold', label: 'Gold', icon: Coins },
     { id: 'cards', label: 'Cards', icon: CreditCard },
     { id: 'loans', label: 'Loans', icon: Building },
-    { id: 'reminders', label: 'Reminders', icon: Bell }
+    { id: 'assets', label: 'ASSET', icon: Coins },
+    { id: 'gifts', label: 'Gift & IOU', icon: Gift }
   ];
 
   return (
@@ -51,7 +47,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all duration-150 min-w-[50px] ${
+              className={`flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all duration-150 min-w-[48px] ${
                 isActive
                   ? 'bg-indigo-600/20 text-indigo-400 font-black border border-indigo-500/30 shadow-md shadow-indigo-500/10'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'

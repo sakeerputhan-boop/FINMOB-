@@ -1,6 +1,6 @@
 {
-  "name": "FINMOB",
-  "description": "Personal wealth, net worth, asset tracking, and liquid cash management PWA with real-time sync.",
+  "name": "MYFIN",
+  "description": "Multi-country financial tracker, net worth, credit card, and loan manager with real-time cloud sync.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

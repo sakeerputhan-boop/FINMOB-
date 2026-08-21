@@ -1,27 +1,36 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   Wallet,
   Globe,
-  Smartphone,
-  Share2,
   Lock,
   Unlock,
   KeyRound,
-  UserCheck,
   Download,
-  FileText,
-  Rocket,
-  CheckCircle2,
-  Wifi,
-  Sparkles
+  Share2,
+  CloudCheck,
+  CloudOff,
+  RefreshCw,
+  Plus,
+  Bell,
+  Sparkles,
+  Tag,
+  Settings,
+  AlertTriangle
 } from 'lucide-react';
-import { CurrencyCode, SyncState, UserProfile } from '../types';
-import { CURRENCIES } from '../utils/currency';
-import finmobLogo from '../assets/images/finmob_app_logo_1786598798207.jpg';
+import { CurrencyCode, UserProfile, SyncState, FinancialItem } from '../types';
+import { COUNTRIES, CURRENCIES, getCountryByName } from '../utils/currency';
 
 interface HeaderProps {
   currency: CurrencyCode;
   onCurrencyChange: (c: CurrencyCode) => void;
+  selectedCountry: string;
+  onCountryChange: (country: string) => void;
+  items: FinancialItem[];
+  remindersCount: number;
+  upcomingDueCount: number;
+  onOpenReminders: () => void;
+  onOpenUpcomingAlerts: () => void;
+  onOpenAppSettings: () => void;
   user: UserProfile | null;
   syncState: SyncState;
   onOpenAuth: () => void;
@@ -30,13 +39,21 @@ interface HeaderProps {
   deferredInstallPrompt: any;
   onInstallPwa: () => void;
   savedPin: string | null;
-  onOpenPinSetup: () => void;
   onLockApp: () => void;
+  onQuickAddItem: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currency,
   onCurrencyChange,
+  selectedCountry,
+  onCountryChange,
+  items = [],
+  remindersCount = 0,
+  upcomingDueCount = 0,
+  onOpenReminders,
+  onOpenUpcomingAlerts,
+  onOpenAppSettings,
   user,
   syncState,
   onOpenAuth,
@@ -45,156 +62,251 @@ export const Header: React.FC<HeaderProps> = ({
   deferredInstallPrompt,
   onInstallPwa,
   savedPin,
-  onOpenPinSetup,
-  onLockApp
+  onLockApp,
+  onQuickAddItem
 }) => {
-  const [showCurrencyDropdown, setShowCurrencyDropdown] = useState(false);
+  // Only show countries where the user holds accounts/items (or default UAE + India if empty)
+  const holdingCountryNames = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((i) => {
+      if (i.country && i.country.trim() && i.country.toUpperCase() !== 'ALL') {
+        set.add(i.country.trim());
+      }
+    });
+    if (set.size === 0) {
+      set.add('UAE');
+      set.add('India');
+    }
+    return Array.from(set);
+  }, [items]);
+
+  const activeHoldingCountries = useMemo(() => {
+    return holdingCountryNames.map((name) => getCountryByName(name));
+  }, [holdingCountryNames]);
+
+  // When switching country, automatically sync currency to that country's currency!
+  const handleSelectCountry = (countryName: string) => {
+    onCountryChange(countryName);
+    if (countryName !== 'ALL') {
+      const matched = getCountryByName(countryName);
+      if (matched && matched.currency) {
+        onCurrencyChange(matched.currency);
+      }
+    }
+  };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 transition-all">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+    <header className="sticky top-0 z-40 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-800/80 transition-all">
+      <div className="max-w-7xl mx-auto px-4 py-3 space-y-2.5">
         
-        {/* Brand & Logo */}
-        <div className="flex items-center gap-2.5">
-          <img
-            src={finmobLogo}
-            alt="FINMOB App Logo"
-            className="h-10 w-10 rounded-xl object-cover border border-indigo-500/40 shadow-lg shadow-indigo-500/20"
-          />
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-black text-xl tracking-wider text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-slate-400">
-                FINMOB
-              </span>
-              <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                PWA
-              </span>
+        {/* Top Row: App Brand, Alerts, Reminders, Quick Add, Security, Sync, Auth */}
+        <div className="flex items-center justify-between gap-3">
+          
+          {/* HD Logo & Brand: MYFIN */}
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 rounded-2xl overflow-hidden bg-slate-900 border border-slate-700/60 shadow-lg shadow-indigo-500/20 flex items-center justify-center shrink-0">
+              <img
+                src="/logo.jpg"
+                alt="MYFIN Logo"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                }}
+              />
             </div>
-            <p className="text-[11px] text-slate-400 hidden sm:block">
-              Daily Operating Accounts, Independent FDs & Gold Assets
-            </p>
-          </div>
-        </div>
-
-        {/* Header Right Actions */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          
-          {/* PIN Lock Security Button */}
-          <button
-            onClick={savedPin ? onLockApp : onOpenPinSetup}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition ${
-              savedPin
-                ? 'bg-indigo-950/80 border-indigo-500/50 text-indigo-300 hover:bg-indigo-900/80'
-                : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700'
-            }`}
-            title={savedPin ? 'Lock App Now (PIN Active)' : 'Set 4-Digit Security PIN'}
-          >
-            {savedPin ? (
-              <>
-                <Lock className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="hidden md:inline text-[11px]">Lock App</span>
-              </>
-            ) : (
-              <>
-                <KeyRound className="w-3.5 h-3.5 text-slate-400" />
-                <span className="hidden md:inline text-[11px]">Set PIN</span>
-              </>
-            )}
-          </button>
-          
-          {/* Currency Switcher */}
-          <div className="relative">
-            <button
-              onClick={() => setShowCurrencyDropdown(!showCurrencyDropdown)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/60 border border-indigo-800/50 hover:bg-indigo-900/50 text-indigo-300 text-xs font-medium transition"
-              title="Select Currency"
-            >
-              <Globe className="w-3.5 h-3.5 text-indigo-400" />
-              <span>{currency} {CURRENCIES[currency].symbol}</span>
-              <span className="text-[9px] bg-indigo-500/30 text-indigo-200 px-1 rounded uppercase font-bold tracking-wider">LIVE</span>
-            </button>
-
-            {showCurrencyDropdown && (
-              <div className="absolute right-0 mt-2 w-44 rounded-xl bg-slate-900 border border-slate-700 shadow-xl py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-800">
-                  Select Currency
-                </div>
-                {(Object.keys(CURRENCIES) as CurrencyCode[]).map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => {
-                      onCurrencyChange(c);
-                      setShowCurrencyDropdown(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800 transition ${
-                      currency === c ? 'bg-indigo-600/20 text-indigo-300 font-semibold' : 'text-slate-300'
-                    }`}
-                  >
-                    <span>{CURRENCIES[c].name}</span>
-                    <span className="font-mono text-slate-400">{CURRENCIES[c].symbol}</span>
-                  </button>
-                ))}
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-base font-black text-white tracking-tight">MYFIN</h1>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  Global
+                </span>
               </div>
-            )}
+              <p className="text-[10px] text-slate-400">Multi-Country Financial Hub</p>
+            </div>
           </div>
 
-          {/* Sync & Auth Status Badge */}
-          <button
-            onClick={onOpenAuth}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-              user && !user.isAnonymous
-                ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300 hover:bg-emerald-900/40'
-                : 'bg-amber-950/40 border-amber-800/60 text-amber-300 hover:bg-amber-900/40'
-            }`}
-            title="Firebase Sync & Account"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                syncState === 'synced' ? 'bg-emerald-400' : 'bg-amber-400'
-              }`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                syncState === 'synced' ? 'bg-emerald-500' : 'bg-amber-500'
-              }`}></span>
-            </span>
-            <span className="hidden md:inline max-w-[120px] truncate">
-              {user && !user.isAnonymous ? user.email : 'Multi-Device Sync'}
-            </span>
-            <span className="md:hidden">
-              {user && !user.isAnonymous ? 'Sync On' : 'Login'}
-            </span>
-          </button>
-
-          {/* Deploy to Vercel/Netlify Guide */}
-          <button
-            onClick={onOpenDeployGuide}
-            className="p-2 rounded-lg bg-slate-800/80 border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-700 transition"
-            title="Deploy to Vercel or Netlify Guide"
-          >
-            <Rocket className="w-4 h-4 text-cyan-400" />
-          </button>
-
-          {/* Export / WhatsApp Statement */}
-          <button
-            onClick={onOpenExportModal}
-            className="p-2 rounded-lg bg-slate-800/80 border border-slate-700/80 text-slate-300 hover:text-white hover:bg-slate-700 transition"
-            title="WhatsApp PDF & Export"
-          >
-            <FileText className="w-4 h-4 text-emerald-400" />
-          </button>
-
-          {/* PWA Install Button */}
-          {deferredInstallPrompt && (
+          {/* Right Action Bar */}
+          <div className="flex items-center gap-2">
+            
+            {/* Unified Smart Reminders & 7-Day Due Alerts Bell Icon */}
             <button
-              onClick={onInstallPwa}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-semibold shadow-md hover:from-indigo-500 hover:to-purple-500 transition animate-pulse"
+              onClick={() => {
+                if (upcomingDueCount > 0) {
+                  onOpenUpcomingAlerts();
+                } else {
+                  onOpenReminders();
+                }
+              }}
+              className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition text-xs font-bold active:scale-95 shadow-sm ${
+                upcomingDueCount > 0
+                  ? 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border-rose-500/40 animate-pulse shadow-rose-500/10'
+                  : remindersCount > 0
+                  ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30 shadow-amber-500/10'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+              }`}
+              title="Smart Reminders, Bill Expiries & Upcoming Dues"
             >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Install PWA</span>
+              <Bell className={`w-4 h-4 ${upcomingDueCount > 0 ? 'text-rose-400' : remindersCount > 0 ? 'text-amber-400' : 'text-slate-400'}`} />
+              <span className="hidden sm:inline">Reminders</span>
+              {(upcomingDueCount > 0 || remindersCount > 0) && (
+                <span
+                  className={`font-black text-[10px] px-1.5 py-0.2 rounded-full min-w-[18px] text-center text-white ${
+                    upcomingDueCount > 0 ? 'bg-rose-500' : 'bg-amber-500 text-slate-950'
+                  }`}
+                >
+                  {upcomingDueCount > 0 ? upcomingDueCount : remindersCount}
+                </span>
+              )}
             </button>
-          )}
+
+            {/* Consolidated App Settings Button */}
+            <button
+              onClick={onOpenAppSettings}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 transition text-xs font-bold active:scale-95 shadow-sm"
+              title="App Settings (Categories, PIN, Currency, Holding Countries)"
+            >
+              <Settings className="w-4 h-4 text-indigo-400" />
+              <span className="hidden sm:inline">Settings</span>
+            </button>
+
+            {/* In-header Add Button */}
+            <button
+              onClick={onQuickAddItem}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-md shadow-indigo-600/30 transition active:scale-95"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span className="hidden sm:inline">Add</span>
+            </button>
+
+            {/* Export WhatsApp PDF */}
+            <button
+              onClick={onOpenExportModal}
+              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition"
+              title="Export WhatsApp Statement & PDF"
+            >
+              <Share2 className="w-4 h-4 text-cyan-400" />
+            </button>
+
+            {/* PIN Security button */}
+            {savedPin && (
+              <button
+                onClick={onLockApp}
+                className="p-2 rounded-xl bg-amber-950/30 text-amber-300 border border-amber-800/40 hover:bg-amber-900/40 transition"
+                title="Lock App with PIN"
+              >
+                <Lock className="w-4 h-4 text-amber-400" />
+              </button>
+            )}
+
+            {/* Cloud Sync Status / Auth */}
+            <button
+              onClick={onOpenAuth}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition ${
+                syncState === 'synced'
+                  ? 'bg-emerald-950/30 text-emerald-300 border-emerald-800/40'
+                  : syncState === 'syncing'
+                  ? 'bg-indigo-950/30 text-indigo-300 border-indigo-800/40'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+              }`}
+              title="Cloud Synchronization & Account"
+            >
+              {syncState === 'synced' ? (
+                <>
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="hidden sm:inline">Synced</span>
+                </>
+              ) : syncState === 'syncing' ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                  <span className="hidden sm:inline">Syncing</span>
+                </>
+              ) : (
+                <>
+                  <CloudOff className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="hidden sm:inline">Offline</span>
+                </>
+              )}
+            </button>
+
+            {/* Install PWA Prompt */}
+            {deferredInstallPrompt && (
+              <button
+                onClick={onInstallPwa}
+                className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 text-white font-extrabold text-xs shadow-md shadow-indigo-500/20"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Install</span>
+              </button>
+            )}
+
+          </div>
 
         </div>
+
+        {/* Bottom Row: Only Show Account Holding Countries & Auto Sync Currency */}
+        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-0.5 text-xs no-scrollbar">
+          
+          <div className="flex items-center gap-1.5 flex-nowrap">
+            <span className="text-[10px] font-extrabold uppercase text-slate-400 mr-1 flex items-center gap-1">
+              <Globe className="w-3.5 h-3.5 text-indigo-400" />
+              Holding Countries:
+            </span>
+
+            {/* Global / All Option */}
+            <button
+              onClick={() => handleSelectCountry('ALL')}
+              className={`px-3 py-1 rounded-xl font-bold transition whitespace-nowrap text-xs border ${
+                selectedCountry === 'ALL'
+                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
+              🌐 Global (All)
+            </button>
+
+            {/* ONLY Show Account Holding Countries */}
+            {activeHoldingCountries.map((c) => {
+              const isSelected = selectedCountry.toLowerCase() === c.name.toLowerCase();
+              return (
+                <button
+                  key={c.code}
+                  onClick={() => handleSelectCountry(c.name)}
+                  className={`px-3 py-1 rounded-xl font-bold transition whitespace-nowrap text-xs border flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30 font-extrabold'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  <span>{c.flag}</span>
+                  <span>{c.name}</span>
+                  <span className={`text-[10px] ${isSelected ? 'text-indigo-200 font-mono' : 'text-slate-500'}`}>
+                    ({c.currency})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Display Currency Conversion Picker */}
+          <div className="flex items-center gap-1 ml-auto flex-shrink-0">
+            <select
+              value={currency}
+              onChange={(e) => onCurrencyChange(e.target.value as CurrencyCode)}
+              className="bg-slate-900 text-slate-300 border border-slate-800 text-[11px] font-bold rounded-lg px-2 py-1 outline-none focus:border-indigo-500"
+              title="Display Currency"
+            >
+              {Object.values(CURRENCIES).map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} ({c.symbol.trim()})
+                </option>
+              ))}
+            </select>
+          </div>
+
+        </div>
+
       </div>
     </header>
   );
 };
+

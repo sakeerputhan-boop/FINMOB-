@@ -10,9 +10,10 @@ import {
   Delete,
   RotateCcw,
   Sparkles,
-  Smartphone
+  Smartphone,
+  RefreshCw,
+  Trash2
 } from 'lucide-react';
-import finmobLogo from '../assets/images/finmob_app_logo_1786598798207.jpg';
 
 interface PinSetupModalProps {
   isOpen: boolean;
@@ -29,7 +30,7 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({
 }) => {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [step, setStep] = useState<'create' | 'confirm' | 'current'>('create');
+  const [step, setStep] = useState<'create' | 'confirm' | 'current' | 'reset_confirm'>('create');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -58,7 +59,7 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({
         if (next.length === 4) {
           if (step === 'current') {
             if (next === savedPin) {
-              // Verified current PIN
+              // Verified current PIN -> proceed to create new PIN
               setPin('');
               setStep('create');
             } else {
@@ -77,7 +78,7 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({
         if (next.length === 4) {
           if (next === pin) {
             onSavePin(next);
-            setSuccess('PIN Security Enabled Successfully!');
+            setSuccess(savedPin ? 'PIN Changed Successfully!' : 'PIN Security Enabled Successfully!');
             setTimeout(() => {
               onClose();
             }, 1200);
@@ -107,6 +108,14 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({
     }, 1000);
   };
 
+  const handleDirectResetPin = () => {
+    onSavePin(null);
+    setPin('');
+    setConfirmPin('');
+    setError('');
+    setStep('create');
+  };
+
   const activeValue = step === 'confirm' ? confirmPin : pin;
 
   return (
@@ -116,18 +125,16 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({
         {/* Header */}
         <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
           <div className="flex items-center gap-3">
-            <img
-              src={finmobLogo}
-              alt="FINMOB Logo"
-              className="w-9 h-9 rounded-xl object-cover border border-indigo-500/30 shadow-md"
-            />
+            <div className="w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-black">
+              M
+            </div>
             <div>
               <h2 className="text-sm font-extrabold text-white flex items-center gap-1.5">
                 <Lock className="w-4 h-4 text-indigo-400" />
-                <span>PIN Security Setup</span>
+                <span>MYFIN PIN Security</span>
               </h2>
               <p className="text-[11px] text-slate-400">
-                Protect your financial data with a 4-digit PIN code.
+                {savedPin ? 'Change, reset, or disable your 4-digit PIN' : 'Protect your wealth records with a 4-digit PIN'}
               </p>
             </div>
           </div>
@@ -148,21 +155,52 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({
               </div>
               <p className="text-sm font-extrabold text-emerald-300">{success}</p>
             </div>
+          ) : step === 'reset_confirm' ? (
+            <div className="py-4 space-y-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto">
+                <RefreshCw className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">Reset Security PIN?</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                  This will clear your current PIN and allow you to set a brand new 4-digit security code immediately.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setStep('current')}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDirectResetPin}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold shadow-md transition"
+                >
+                  Confirm Reset PIN
+                </button>
+              </div>
+            </div>
           ) : (
             <>
               <div>
                 <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
                   {step === 'current'
-                    ? 'Enter Current PIN'
+                    ? 'Enter Current PIN to Change'
                     : step === 'create'
-                    ? 'Set 4-Digit Security PIN'
-                    : 'Confirm Your 4-Digit PIN'}
+                    ? savedPin
+                      ? 'Enter New 4-Digit PIN'
+                      : 'Set 4-Digit Security PIN'
+                    : 'Confirm New 4-Digit PIN'}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
                   {step === 'current'
-                    ? 'Enter your existing PIN to change settings'
+                    ? 'Enter current PIN or use the Reset PIN option below'
                     : step === 'create'
-                    ? 'Choose a memorable 4-digit passcode'
+                    ? 'Choose a 4-digit passcode'
                     : 'Re-enter your 4-digit PIN to confirm'}
                 </p>
               </div>
@@ -204,11 +242,12 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({
                   {savedPin && (
                     <button
                       type="button"
-                      onClick={handleDisablePin}
-                      className="text-[10px] font-bold text-rose-400 hover:text-rose-300 underline"
-                      title="Disable PIN Security"
+                      onClick={() => setStep('reset_confirm')}
+                      className="text-[10px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-0.5 underline"
+                      title="Reset PIN"
                     >
-                      Turn Off
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Reset</span>
                     </button>
                   )}
                 </div>
@@ -227,6 +266,28 @@ export const PinSetupModal: React.FC<PinSetupModalProps> = ({
                   <Delete className="w-5 h-5" />
                 </button>
               </div>
+
+              {/* Extra action: Disable PIN */}
+              {savedPin && step === 'current' && (
+                <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs px-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep('reset_confirm')}
+                    className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Reset / Forgot PIN</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisablePin}
+                    className="text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Disable PIN</span>
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -239,15 +300,18 @@ interface PinLockScreenProps {
   isLocked: boolean;
   savedPin: string;
   onUnlock: () => void;
+  onResetPin?: () => void;
 }
 
 export const PinLockScreen: React.FC<PinLockScreenProps> = ({
   isLocked,
   savedPin,
-  onUnlock
+  onUnlock,
+  onResetPin
 }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   if (!isLocked) return null;
 
@@ -263,7 +327,7 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
         } else {
           setError(true);
           setPin('');
-          if (navigator.vibrate) {
+          if (typeof navigator !== 'undefined' && navigator.vibrate) {
             navigator.vibrate([100, 50, 100]);
           }
         }
@@ -281,20 +345,18 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
       
       <div className="w-full max-w-sm text-center space-y-6">
         
-        {/* FINMOB App Logo & Header */}
+        {/* MYFIN App Logo & Header */}
         <div className="flex flex-col items-center space-y-3">
           <div className="relative">
-            <img
-              src={finmobLogo}
-              alt="FINMOB App Logo"
-              className="w-20 h-20 rounded-2xl object-cover border-2 border-indigo-500/40 shadow-2xl shadow-indigo-500/30"
-            />
-            <div className="absolute -bottom-1 -right-1 p-1.5 rounded-lg bg-indigo-600 text-white shadow-md">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-600 via-indigo-700 to-cyan-700 border-2 border-indigo-400/40 shadow-2xl shadow-indigo-500/30 flex items-center justify-center text-3xl font-black text-white">
+              M
+            </div>
+            <div className="absolute -bottom-1 -right-1 p-1.5 rounded-lg bg-indigo-600 text-white shadow-md border border-indigo-400">
               <Lock className="w-4 h-4 stroke-[3]" />
             </div>
           </div>
           <div>
-            <h1 className="text-2xl font-black tracking-wider text-white">FINMOB</h1>
+            <h1 className="text-2xl font-black tracking-wider text-white">MYFIN</h1>
             <p className="text-xs text-indigo-300/80 font-medium mt-0.5">
               App Locked — Enter 4-Digit Security PIN
             </p>
@@ -336,8 +398,13 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
             </button>
           ))}
           <div className="flex items-center justify-center">
-            {/* Blank or Biometric visual */}
-            <Smartphone className="w-5 h-5 text-slate-600" />
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(true)}
+              className="text-[11px] font-bold text-slate-400 hover:text-amber-300 transition underline"
+            >
+              Forgot?
+            </button>
           </div>
           <button
             type="button"
@@ -356,10 +423,45 @@ export const PinLockScreen: React.FC<PinLockScreenProps> = ({
         </div>
 
         <p className="text-[11px] text-slate-500 pt-4">
-          Protected with FINMOB Encrypted Storage
+          Protected with MYFIN Encrypted Storage
         </p>
 
       </div>
+
+      {/* Forgot / Reset PIN modal dialog */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-xs w-full text-center space-y-4 shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+              <RotateCcw className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-black text-white">Reset Security PIN</h3>
+            <p className="text-xs text-slate-400">
+              Would you like to reset and clear the PIN lock on this device?
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowForgotModal(false)}
+                className="flex-1 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotModal(false);
+                  if (onResetPin) onResetPin();
+                }}
+                className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold"
+              >
+                Reset PIN
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

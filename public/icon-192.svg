@@ -1,36 +1,50 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A"/>
-      <stop offset="50%" stop-color="#0B0F19"/>
-      <stop offset="100%" stop-color="#1E1B4B"/>
+    <linearGradient id="myfinBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090D16"/>
+      <stop offset="50%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="40%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399"/>
+      <stop offset="100%" stop-color="#059669"/>
     </linearGradient>
     <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F59E0B"/>
-      <stop offset="50%" stop-color="#FBBF24"/>
-      <stop offset="100%" stop-color="#D97706"/>
+      <stop offset="0%" stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
     </linearGradient>
-    <linearGradient id="indigoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#6366F1"/>
-      <stop offset="100%" stop-color="#4F46E5"/>
-    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
   </defs>
 
-  <!-- Background -->
-  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
-  <rect width="504" height="504" x="4" y="4" rx="124" fill="none" stroke="#334155" stroke-width="4"/>
+  <!-- Background Canvas -->
+  <rect width="512" height="512" rx="128" fill="url(#myfinBg)"/>
+  <rect width="504" height="504" x="4" y="4" rx="124" fill="none" stroke="#1E293B" stroke-width="4"/>
 
-  <!-- Outer Shield Emblem -->
-  <path d="M256 96 C 340 96, 384 128, 384 192 C 384 320, 256 400, 256 416 C 256 400, 128 320, 128 192 C 128 128, 172 96, 256 96 Z" fill="none" stroke="url(#goldGrad)" stroke-width="20" stroke-linejoin="round"/>
+  <!-- Modern Geometric 'M' Shield Emblem -->
+  <g filter="url(#glow)">
+    <!-- Outer Diamond Shield -->
+    <path d="M256 72 L392 144 L392 312 L256 408 L120 312 L120 144 Z" 
+          fill="none" stroke="url(#accentGrad)" stroke-width="16" stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>
 
-  <!-- Wallet / Financial Vault Center -->
-  <rect x="180" y="200" width="152" height="112" rx="20" fill="url(#indigoGrad)" stroke="#818CF8" stroke-width="6"/>
-  <path d="M180 236 L332 236" stroke="#312E81" stroke-width="6"/>
+    <!-- Inner 'M' and Financial Growth Nodes -->
+    <path d="M168 290 L168 180 L256 260 L344 180 L344 290" 
+          fill="none" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+          
+    <path d="M208 320 L256 276 L304 320" 
+          fill="none" stroke="url(#emeraldGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <!-- Gold Coin Accent -->
-  <circle cx="286" cy="256" r="18" fill="url(#goldGrad)" stroke="#FEF3C7" stroke-width="4"/>
-  <circle cx="286" cy="256" r="8" fill="#B45309"/>
+    <!-- Central Wealth Node / Coin -->
+    <circle cx="256" cy="214" r="14" fill="url(#goldGrad)"/>
+  </g>
 
-  <!-- FINMOB Lettering -->
-  <text x="256" y="460" font-family="'Inter', sans-serif" font-weight="900" font-size="38" fill="#F8FAFC" text-anchor="middle" letter-spacing="4">FINMOB</text>
+  <!-- Modern Typography MYFIN -->
+  <text x="256" y="458" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="40" fill="#FFFFFF" text-anchor="middle" letter-spacing="6">MYFIN</text>
 </svg>
