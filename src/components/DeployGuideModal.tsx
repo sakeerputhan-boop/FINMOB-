@@ -134,6 +134,27 @@ Install Command: npm install`;
                 </pre>
               </div>
 
+              <div className="p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-xl text-emerald-200 space-y-1.5">
+                <p className="font-semibold text-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>Custom Firebase Project Setup (Vercel Environment Variables):</span>
+                </p>
+                <p className="text-slate-300 text-[11px] leading-relaxed">
+                  To connect your own Firebase project on Vercel, add these in <strong>Vercel &gt; Settings &gt; Environment Variables</strong>, then trigger a <strong>Redeploy</strong>:
+                </p>
+                <pre className="bg-slate-900 p-2 rounded border border-slate-800 font-mono text-[10px] text-slate-300 overflow-x-auto">
+{`VITE_FIREBASE_API_KEY=AIzaSy...
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+VITE_FIREBASE_APP_ID=1:123456789:web:...`}
+                </pre>
+                <p className="text-[10px] text-emerald-400">
+                  Note: In your Firebase Console, make sure to add <code>finmob-phi.vercel.app</code> under <strong>Authentication &gt; Settings &gt; Authorized domains</strong> of that exact project.
+                </p>
+              </div>
+
               <div className="p-3 bg-indigo-950/30 border border-indigo-800/40 rounded-xl text-indigo-200">
                 <p className="font-semibold">⚡ PWA Ready:</p>
                 <p className="text-slate-300 text-[11px] mt-0.5">

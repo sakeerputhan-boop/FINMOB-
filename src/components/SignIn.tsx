@@ -119,8 +119,11 @@ export const SignIn: React.FC<SignInProps> = ({
         return 'Sign-in popup was closed before completing authentication.';
       case 'auth/network-request-failed':
         return 'Network connection error. Please verify your internet connection.';
-      case 'auth/unauthorized-domain':
-        return `Domain unauthorized: Please add "${window.location.hostname}" to Authorized Domains in Firebase Console > Authentication > Settings > Authorized domains.`;
+      case 'auth/unauthorized-domain': {
+        const activeAuthDomain = (auth.app.options as any)?.authDomain || 'unknown';
+        const activeProjectId = (auth.app.options as any)?.projectId || 'unknown';
+        return `Domain unauthorized: "${window.location.hostname}" is not authorized in Firebase project "${activeProjectId}" (Auth Domain: ${activeAuthDomain}). If you added this domain in a different Firebase project, set your VITE_FIREBASE_* environment variables in Vercel and redeploy.`;
+      }
       case 'auth/too-many-requests':
         return 'Too many attempts. Access is temporarily locked for security. Try again later.';
       case 'auth/operation-not-allowed':

@@ -1,12 +1,12 @@
 {
-  "projectId": "arctic-federation-mf6jr",
-  "appId": "1:427379016519:web:b40549674ac0513d73c262",
-  "apiKey": "AIzaSyCElFxZJS4zU3Jnyu58EHN0vuQbbV3gdCI",
-  "authDomain": "arctic-federation-mf6jr.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-finmob-98ae9b2b-dde8-4155-88f3-2f1f3abb803b",
-  "storageBucket": "arctic-federation-mf6jr.firebasestorage.app",
-  "messagingSenderId": "427379016519",
+  "projectId": "finmob-7e007",
+  "appId": "1:55757491863:web:b5540a29e8cf33289ea3d2",
+  "apiKey": "AIzaSyCOD-r0hXW59fEM9hC-MYIPUjjLUwRFIRc",
+  "authDomain": "finmob-7e007.firebaseapp.com",
+  "firestoreDatabaseId": "myfin",
+  "storageBucket": "finmob-7e007.firebasestorage.app",
+  "messagingSenderId": "55757491863",
   "measurementId": "",
-  "oAuthClientId": "427379016519-r1ljbt2lt8tvnbc8f70qghaosbqoqoqo.apps.googleusercontent.com",
+  "oAuthClientId": "55757491863-626fi1vv0j8l9eq0laeulbsdlune6b99.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }
