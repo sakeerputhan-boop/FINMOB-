@@ -1,3 +1,5 @@
+import { auth, saveUserCustomCategories } from '../lib/firebase';
+
 export type CategoryType = 'expense' | 'income' | 'reminder' | 'asset';
 
 export interface CategoryItem {
@@ -83,6 +85,10 @@ export function getCustomCategories(): CategoryItem[] {
 export function saveCustomCategories(categories: CategoryItem[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    // Also sync to Firestore if user is authenticated
+    if (auth.currentUser?.uid) {
+      saveUserCustomCategories(auth.currentUser.uid, categories);
+    }
   } catch (e) {
     console.error('Failed to save custom categories', e);
   }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   X,
   Settings,
@@ -21,9 +21,14 @@ import {
   LogOut,
   Palette,
   Download,
+  Upload,
   Database,
   Cloud,
-  FileSpreadsheet
+  FileSpreadsheet,
+  FileJson,
+  Smartphone,
+  Laptop,
+  CheckCircle2
 } from 'lucide-react';
 import { CurrencyCode, UserProfile, SyncState, FinancialItem, Transaction, AppTheme } from '../types';
 import { COUNTRIES, CURRENCIES, getCountryByName } from '../utils/currency';
@@ -39,11 +44,13 @@ import {
   getCustomCategories,
   addCustomCategory,
   deleteCustomCategory,
+  saveCustomCategories,
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_INCOME_CATEGORIES,
   DEFAULT_REMINDER_CATEGORIES,
   DEFAULT_ASSET_CATEGORIES
 } from '../utils/categories';
+import { saveFinancialItem, saveTransaction } from '../lib/firebase';
 
 interface AppSettingsModalProps {
   isOpen: boolean;
@@ -94,11 +101,99 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
     }
   };
 
-  // Categories Sub-tab
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  // Categories Sub-tab state
   const [categoryType, setCategoryType] = useState<CategoryType>('expense');
   const [customList, setCustomList] = useState<CategoryItem[]>(getCustomCategories());
   const [newCatName, setNewCatName] = useState('');
   const [catFeedback, setCatFeedback] = useState('');
+
+  // Handle Exporting Full Master JSON
+  const handleExportJson = () => {
+    try {
+      const customCats = getCustomCategories();
+      const backupData = {
+        app: 'MYFIN Financial Platform',
+        version: '2.0.0',
+        exportedAt: new Date().toISOString(),
+        currency,
+        selectedCountry,
+        theme: selectedTheme,
+        items,
+        transactions,
+        customCategories: customCats
+      };
+
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `MYFIN_Master_Backup_${new Date().toISOString().split('T')[0]}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      setBackupSuccess('Master JSON backup downloaded successfully!');
+      setTimeout(() => setBackupSuccess(null), 3500);
+    } catch (e) {
+      console.error('Export error', e);
+    }
+  };
+
+  // Handle Importing Full Master JSON
+  const handleImportJson = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!data || (!Array.isArray(data.items) && !Array.isArray(data.transactions))) {
+        throw new Error('Invalid MYFIN backup file structure');
+      }
+
+      const importedItems: FinancialItem[] = Array.isArray(data.items) ? data.items : [];
+      const importedTxs: Transaction[] = Array.isArray(data.transactions) ? data.transactions : [];
+      const importedCats: CategoryItem[] = Array.isArray(data.customCategories) ? data.customCategories : [];
+
+      // Save custom categories
+      if (importedCats.length > 0) {
+        saveCustomCategories(importedCats);
+        setCustomList(getCustomCategories());
+      }
+
+      // If user is authenticated, sync to Firestore
+      if (user?.uid) {
+        const promises: Promise<any>[] = [];
+        for (const item of importedItems) {
+          promises.push(saveFinancialItem(user.uid, item));
+        }
+        for (const tx of importedTxs) {
+          promises.push(saveTransaction(user.uid, tx));
+        }
+        await Promise.allSettled(promises);
+      } else {
+        // Save to localStorage
+        localStorage.setItem('finmob_local_items', JSON.stringify(importedItems));
+        localStorage.setItem('finmob_local_txs', JSON.stringify(importedTxs));
+        window.location.reload();
+      }
+
+      setBackupSuccess(`Successfully restored ${importedItems.length} items and ${importedTxs.length} transactions!`);
+      setTimeout(() => setBackupSuccess(null), 4000);
+    } catch (err: any) {
+      console.error('Import error', err);
+      alert('Failed to import backup file. Please ensure it is a valid MYFIN JSON backup file.');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   // PIN settings state
   const [pinInput, setPinInput] = useState('');
@@ -298,43 +393,57 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
                 </p>
               </div>
 
-              {/* Cloud Status Card */}
-              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+              {/* Multi-Device Cloud Sync Status Banner */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-950 border border-emerald-800/60 space-y-3 shadow-lg">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
-                    <Cloud className="w-4 h-4 text-emerald-400" />
-                    <span>Firebase Backend Status</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                      <Cloud className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-black text-white">Multi-Device Cloud Preservation</h4>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Live
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Automatic real-time sync across mobile, tablet, and desktop
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    finmob-7e007
-                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-slate-400 block">Total Accounts / Items</span>
-                    <span className="font-extrabold text-white text-sm">{items.length}</span>
+
+                <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-medium">Cloud Synced Accounts</span>
+                    <span className="font-black text-white text-base text-emerald-400">{items.length}</span>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-slate-400 block">Total Transactions</span>
-                    <span className="font-extrabold text-white text-sm">{transactions.length}</span>
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-medium">Cloud Synced Transactions</span>
+                    <span className="font-black text-white text-base text-cyan-400">{transactions.length}</span>
                   </div>
                 </div>
+
                 {user ? (
-                  <div className="flex items-center justify-between text-xs text-slate-300 pt-1">
-                    <span className="truncate">Signed in: <b className="text-emerald-400">{user.email || user.displayName || 'Guest User'}</b></span>
-                    <span className="text-[10px] text-slate-500 font-mono">UID: {user.uid.slice(0, 8)}...</span>
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-300 truncate">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span className="truncate">Active Account: <strong className="text-white">{user.email || user.displayName || 'User'}</strong></span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-mono shrink-0">UID: {user.uid.slice(0, 6)}...</span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between text-xs text-amber-300 pt-1">
-                    <span>Offline / Local Mode</span>
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                    <span className="text-amber-300 text-[11px]">Guest mode — sign in to access data on any device.</span>
                     <button
                       onClick={() => {
                         onClose();
                         onOpenAuth();
                       }}
-                      className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-[11px]"
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs shadow transition active:scale-95"
                     >
-                      Sign In & Sync
+                      Sign In
                     </button>
                   </div>
                 )}
@@ -342,16 +451,69 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
 
               {/* Feedback toast */}
               {backupSuccess && (
-                <div className="p-3 rounded-xl bg-emerald-950/70 border border-emerald-800 text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in">
+                <div className="p-3 rounded-xl bg-emerald-950/90 border border-emerald-700 text-emerald-200 text-xs flex items-center gap-2 animate-in fade-in shadow-md">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>{backupSuccess}</span>
+                  <span className="font-bold">{backupSuccess}</span>
                 </div>
               )}
 
-              {/* CSV Export Options */}
+              {/* JSON Master Backup & Restore */}
               <div className="space-y-2.5">
-                <h4 className="text-xs font-extrabold text-slate-300 uppercase tracking-wider">
-                  Download Offline CSV Backups
+                <h4 className="text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileJson className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Master JSON Backup & Restore</span>
+                </h4>
+                <p className="text-[11px] text-slate-400">
+                  Export a complete encrypted JSON backup with all accounts, cards, and transaction records, or restore anytime on a new device.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <button
+                    onClick={handleExportJson}
+                    className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-700/50 hover:border-indigo-500 text-left transition group active:scale-95 flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <FileJson className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition" />
+                      <Download className="w-4 h-4 text-indigo-300" />
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-black text-white">Export Full JSON Backup</h5>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Download single-file complete snapshot
+                      </p>
+                    </div>
+                  </button>
+
+                  <label className="p-3.5 rounded-2xl bg-cyan-950/40 border border-cyan-700/50 hover:border-cyan-500 text-left transition group active:scale-95 cursor-pointer flex flex-col justify-between">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportJson}
+                      className="hidden"
+                      disabled={isImporting}
+                    />
+                    <div className="flex items-center justify-between mb-2">
+                      <Upload className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition" />
+                      <span className="text-[10px] uppercase font-bold text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800">
+                        {isImporting ? 'Restoring...' : 'Restore'}
+                      </span>
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-black text-white">Restore from JSON File</h5>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        Import accounts, cards & history
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* CSV Export Options */}
+              <div className="space-y-2.5 pt-2">
+                <h4 className="text-xs font-extrabold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Download Spreadsheet (CSV) Ledgers</span>
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">

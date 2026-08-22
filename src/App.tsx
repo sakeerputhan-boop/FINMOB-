@@ -48,6 +48,9 @@ import {
   signInAnonymously,
   subscribeToUserItems,
   subscribeToUserTransactions,
+  subscribeToUserSettings,
+  saveUserSettings,
+  subscribeToUserCustomCategories,
   saveFinancialItem as saveFirestoreFinancialItem,
   removeFinancialItem as removeFirestoreFinancialItem,
   saveTransaction as saveFirestoreTransaction,
@@ -81,8 +84,12 @@ export default function App() {
     } catch {}
     return [];
   });
-  const [currency, setCurrency] = useState<CurrencyCode>('AED');
-  const [selectedCountry, setSelectedCountry] = useState<string>('ALL');
+  const [currency, setCurrency] = useState<CurrencyCode>(() => {
+    return (localStorage.getItem('finmob_currency') as CurrencyCode) || 'AED';
+  });
+  const [selectedCountry, setSelectedCountry] = useState<string>(() => {
+    return localStorage.getItem('finmob_country') || 'ALL';
+  });
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [theme, setTheme] = useState<AppTheme>(() => getSavedTheme());
 
@@ -93,6 +100,28 @@ export default function App() {
   const handleThemeChange = (newTheme: AppTheme) => {
     setTheme(newTheme);
     saveTheme(newTheme);
+    const uid = user?.uid || auth.currentUser?.uid;
+    if (uid) {
+      saveUserSettings(uid, { theme: newTheme });
+    }
+  };
+
+  const handleCurrencyChange = (newCurrency: CurrencyCode) => {
+    setCurrency(newCurrency);
+    localStorage.setItem('finmob_currency', newCurrency);
+    const uid = user?.uid || auth.currentUser?.uid;
+    if (uid) {
+      saveUserSettings(uid, { currency: newCurrency });
+    }
+  };
+
+  const handleCountryChange = (newCountry: string) => {
+    setSelectedCountry(newCountry);
+    localStorage.setItem('finmob_country', newCountry);
+    const uid = user?.uid || auth.currentUser?.uid;
+    if (uid) {
+      saveUserSettings(uid, { selectedCountry: newCountry });
+    }
   };
 
   // PIN Security state
@@ -197,10 +226,12 @@ export default function App() {
     }
   };
 
-  // Firebase Auth & Real-Time Sync (Items + Transactions)
+  // Firebase Auth & Real-Time Sync (Items + Transactions + Settings + Categories)
   useEffect(() => {
     let unsubscribeItems: (() => void) | null = null;
     let unsubscribeTxs: (() => void) | null = null;
+    let unsubscribeSettings: (() => void) | null = null;
+    let unsubscribeCategories: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setIsAuthChecking(false);
@@ -240,6 +271,35 @@ export default function App() {
             console.warn('Firestore transactions sync warning:', err);
           }
         );
+
+        // Subscribe to User Preferences / Settings
+        unsubscribeSettings = subscribeToUserSettings(
+          currentUser.uid,
+          (remoteSettings) => {
+            if (remoteSettings.currency) {
+              setCurrency(remoteSettings.currency);
+              localStorage.setItem('finmob_currency', remoteSettings.currency);
+            }
+            if (remoteSettings.selectedCountry) {
+              setSelectedCountry(remoteSettings.selectedCountry);
+              localStorage.setItem('finmob_country', remoteSettings.selectedCountry);
+            }
+            if (remoteSettings.theme) {
+              setTheme(remoteSettings.theme);
+              saveTheme(remoteSettings.theme);
+            }
+          }
+        );
+
+        // Subscribe to User Custom Categories
+        unsubscribeCategories = subscribeToUserCustomCategories(
+          currentUser.uid,
+          (remoteCats) => {
+            if (Array.isArray(remoteCats) && remoteCats.length > 0) {
+              localStorage.setItem('myfin_custom_categories_v2', JSON.stringify(remoteCats));
+            }
+          }
+        );
       } else {
         setUser(null);
         setSyncState('guest');
@@ -254,6 +314,8 @@ export default function App() {
       unsubscribeAuth();
       if (unsubscribeItems) unsubscribeItems();
       if (unsubscribeTxs) unsubscribeTxs();
+      if (unsubscribeSettings) unsubscribeSettings();
+      if (unsubscribeCategories) unsubscribeCategories();
     };
   }, []);
 
@@ -719,9 +781,9 @@ export default function App() {
         isOpen={isAppSettingsOpen}
         onClose={() => setIsAppSettingsOpen(false)}
         currency={currency}
-        onCurrencyChange={setCurrency}
+        onCurrencyChange={handleCurrencyChange}
         selectedCountry={selectedCountry}
-        onCountryChange={setSelectedCountry}
+        onCountryChange={handleCountryChange}
         savedPin={savedPin}
         onSavePin={handleSavePin}
         onLockApp={() => {

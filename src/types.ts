@@ -162,9 +162,10 @@ export type AppTheme = 'modern_dark' | 'clean_light' | 'emerald_growth' | 'royal
 
 export interface UserSettings {
   currency: CurrencyCode;
-  defaultCountry: string;
-  currencySymbol: string;
-  theme: AppTheme;
+  defaultCountry?: string;
+  selectedCountry?: string;
+  currencySymbol?: string;
+  theme?: AppTheme;
   lastSynced?: string;
 }
 

@@ -19,12 +19,16 @@ import {
 } from 'firebase/auth';
 import {
   getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   doc,
   setDoc,
   deleteDoc,
   onSnapshot,
   query,
+  where,
   orderBy,
   serverTimestamp,
   getDoc,
@@ -35,6 +39,7 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getMessaging, getToken, onMessage, Messaging, isSupported as isMessagingSupported } from 'firebase/messaging';
 import appletConfig from '../../firebase-applet-config.json';
 import { FinancialItem, Transaction, UserSettings } from '../types';
+import { CategoryItem } from '../utils/categories';
 
 // Check if a custom valid API Key is provided via VITE_FIREBASE_API_KEY
 const envApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
@@ -78,8 +83,18 @@ if (typeof window !== 'undefined') {
 // Initialize Firebase Authentication
 export const auth: Auth = getAuth(app);
 
-// Initialize Cloud Firestore (supports standard default database or custom named database)
-export const db: Firestore = customDatabaseId ? getFirestore(app, customDatabaseId) : getFirestore(app);
+// Initialize Cloud Firestore with multi-tab persistent cache for instant offline restore and multi-device durability
+let firestoreDb: Firestore;
+try {
+  firestoreDb = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  }, customDatabaseId);
+} catch (e) {
+  firestoreDb = customDatabaseId ? getFirestore(app, customDatabaseId) : getFirestore(app);
+}
+export const db: Firestore = firestoreDb;
 
 // Initialize Cloud Storage
 export const storage: FirebaseStorage = getStorage(app);
@@ -166,10 +181,9 @@ export function subscribeToUserItems(
   onError?: (err: Error) => void
 ) {
   const itemsRef = collection(db, 'users', userId, 'items');
-  const q = query(itemsRef, orderBy('updatedAt', 'desc'));
 
   return onSnapshot(
-    q,
+    itemsRef,
     (snapshot) => {
       const items: FinancialItem[] = [];
       snapshot.forEach((docSnap) => {
@@ -225,6 +239,14 @@ export function subscribeToUserItems(
           lastUsedAt: data.lastUsedAt || undefined
         });
       });
+
+      // Sort in-memory safely by updatedAt descending, then createdAt descending
+      items.sort((a, b) => {
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+
       onData(items);
     },
     (err) => {
@@ -271,10 +293,9 @@ export function subscribeToUserTransactions(
   onError?: (err: Error) => void
 ) {
   const txRef = collection(db, 'users', userId, 'transactions');
-  const q = query(txRef, orderBy('date', 'desc'));
 
   return onSnapshot(
-    q,
+    txRef,
     (snapshot) => {
       const txs: Transaction[] = [];
       snapshot.forEach((docSnap) => {
@@ -299,6 +320,14 @@ export function subscribeToUserTransactions(
           createdAt: data.createdAt || new Date().toISOString()
         });
       });
+
+      // Sort in-memory safely by date descending
+      txs.sort((a, b) => {
+        const timeA = new Date(a.date || a.createdAt || 0).getTime();
+        const timeB = new Date(b.date || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+
       onData(txs);
     },
     (err) => {
@@ -339,7 +368,7 @@ export async function removeTransaction(userId: string, txId: string) {
 // Settings subscription
 export function subscribeToUserSettings(
   userId: string,
-  onData: (settings: UserSettings) => void
+  onData: (settings: Partial<UserSettings>) => void
 ) {
   const settingsRef = doc(db, 'users', userId, 'settings', 'preferences');
   return onSnapshot(settingsRef, (docSnap) => {
@@ -347,6 +376,42 @@ export function subscribeToUserSettings(
       onData(docSnap.data() as UserSettings);
     }
   });
+}
+
+// Save user settings / preferences to Firestore
+export async function saveUserSettings(userId: string, settings: Partial<UserSettings>) {
+  try {
+    const settingsRef = doc(db, 'users', userId, 'settings', 'preferences');
+    await setDoc(settingsRef, sanitizeFirestoreData(settings), { merge: true });
+  } catch (err) {
+    console.warn('Could not save user settings to Firestore:', err);
+  }
+}
+
+// Custom categories subscription
+export function subscribeToUserCustomCategories(
+  userId: string,
+  onData: (categories: CategoryItem[]) => void
+) {
+  const catRef = doc(db, 'users', userId, 'settings', 'categories');
+  return onSnapshot(catRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (Array.isArray(data?.categories)) {
+        onData(data.categories);
+      }
+    }
+  });
+}
+
+// Save custom categories to Firestore
+export async function saveUserCustomCategories(userId: string, categories: CategoryItem[]) {
+  try {
+    const catRef = doc(db, 'users', userId, 'settings', 'categories');
+    await setDoc(catRef, { categories, updatedAt: new Date().toISOString() }, { merge: true });
+  } catch (err) {
+    console.warn('Could not save custom categories to Firestore:', err);
+  }
 }
 
 // Check if user profile has already been initialized (prevents unwanted sample data re-seeding)
