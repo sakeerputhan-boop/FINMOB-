@@ -11,6 +11,9 @@ import {
   signInWithPopup,
   sendPasswordResetEmail,
   updateProfile,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
   User,
   Auth
 } from 'firebase/auth';
@@ -102,7 +105,10 @@ export {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
-  updateProfile
+  updateProfile,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 };
 
 // ==========================================

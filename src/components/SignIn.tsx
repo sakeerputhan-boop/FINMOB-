@@ -26,6 +26,9 @@ import {
   signInAnonymously,
   sendPasswordResetEmail,
   updateProfile,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
   auth
 } from '../lib/firebase';
 
@@ -45,7 +48,10 @@ export const SignIn: React.FC<SignInProps> = ({
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [rememberMe, setRememberMe] = useState<boolean>(() => {
+    const saved = localStorage.getItem('myfin_remember_me');
+    return saved === null || saved === 'true';
+  });
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | 'apple' | 'biometric' | 'guest' | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -140,18 +146,34 @@ export const SignIn: React.FC<SignInProps> = ({
     setLoading(true);
 
     try {
+      // Configure Firebase Auth Persistence based on Remember Me choice
+      try {
+        await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      } catch (pErr) {
+        console.warn('Could not set persistence:', pErr);
+      }
+
       if (mode === 'signup') {
         const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (displayName.trim() && cred.user) {
           await updateProfile(cred.user, { displayName: displayName.trim() });
+        }
+        if (rememberMe) {
+          localStorage.setItem('myfin_remembered_email', email.trim());
+          localStorage.setItem('myfin_remember_me', 'true');
+        } else {
+          localStorage.removeItem('myfin_remembered_email');
+          localStorage.setItem('myfin_remember_me', 'false');
         }
         setSuccessMsg('Account created successfully! Welcome to MYFIN.');
       } else if (mode === 'signin') {
         await signInWithEmailAndPassword(auth, email.trim(), password);
         if (rememberMe) {
           localStorage.setItem('myfin_remembered_email', email.trim());
+          localStorage.setItem('myfin_remember_me', 'true');
         } else {
           localStorage.removeItem('myfin_remembered_email');
+          localStorage.setItem('myfin_remember_me', 'false');
         }
       }
 
@@ -550,8 +572,8 @@ export const SignIn: React.FC<SignInProps> = ({
                 </div>
               </div>
 
-              {/* Remember Me Checkbox */}
-              {mode === 'signin' && (
+              {/* Remember Me Checkbox for Sign In & Sign Up */}
+              {(mode === 'signin' || mode === 'signup') && (
                 <div className="flex items-center justify-between pt-0.5">
                   <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-300">
                     <input
@@ -560,7 +582,7 @@ export const SignIn: React.FC<SignInProps> = ({
                       onChange={(e) => setRememberMe(e.target.checked)}
                       className="w-4 h-4 rounded bg-slate-950 border-slate-700 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-900"
                     />
-                    <span>Remember my device</span>
+                    <span>Remember my device / Stay signed in</span>
                   </label>
                 </div>
               )}

@@ -34,7 +34,6 @@ import {
   SyncState,
   AppTheme
 } from './types';
-import { SAMPLE_ITEMS, SAMPLE_TRANSACTIONS } from './data/sampleData';
 import { calculateUpcomingDueItems, requestMobileNotificationPermission, sendLocalDueNotification } from './utils/notifications';
 import { getSavedTheme, saveTheme, applyThemeToDocument } from './utils/theme';
 import {
@@ -42,6 +41,7 @@ import {
   recordLastUsedCategory,
   recordLastUsedItem
 } from './utils/recentUsage';
+import { SignIn } from './components/SignIn';
 import {
   auth,
   onAuthStateChanged,
@@ -59,34 +59,27 @@ import {
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [syncState, setSyncState] = useState<SyncState>('syncing');
   const [items, setItems] = useState<FinancialItem[]>(() => {
     try {
       const cached = localStorage.getItem('finmob_local_items');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    const initial = SAMPLE_ITEMS.map((s, idx) => ({ ...s, id: `local_${idx}`, userId: 'guest' }));
-    try {
-      localStorage.setItem('finmob_local_items', JSON.stringify(initial));
-    } catch {}
-    return initial;
+    return [];
   });
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     try {
       const cached = localStorage.getItem('finmob_local_txs');
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    const initialTxs = SAMPLE_TRANSACTIONS.map((t, idx) => ({ ...t, id: `localtx_${idx}`, userId: 'guest' }));
-    try {
-      localStorage.setItem('finmob_local_txs', JSON.stringify(initialTxs));
-    } catch {}
-    return initialTxs;
+    return [];
   });
   const [currency, setCurrency] = useState<CurrencyCode>('AED');
   const [selectedCountry, setSelectedCountry] = useState<string>('ALL');
@@ -210,6 +203,7 @@ export default function App() {
     let unsubscribeTxs: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      setIsAuthChecking(false);
       if (currentUser) {
         setUser({
           uid: currentUser.uid,
@@ -220,50 +214,14 @@ export default function App() {
         });
         setSyncState('syncing');
 
-        // Check if user has local items/txs in localStorage to migrate to Firestore
-        const cachedLocalItems = localStorage.getItem('finmob_local_items');
-        const cachedLocalTxs = localStorage.getItem('finmob_local_txs');
-        let parsedItems: FinancialItem[] = [];
-        let parsedTxs: Transaction[] = [];
-        try {
-          if (cachedLocalItems) parsedItems = JSON.parse(cachedLocalItems);
-          if (cachedLocalTxs) parsedTxs = JSON.parse(cachedLocalTxs);
-        } catch {}
-
-        if (parsedItems.length > 0 || parsedTxs.length > 0) {
-          await migrateLocalDataToFirestore(currentUser.uid, parsedItems, parsedTxs);
-        }
-
         // Subscribe to real-time Items collection
         unsubscribeItems = subscribeToUserItems(
           currentUser.uid,
-          async (remoteItems) => {
-            if (remoteItems.length === 0) {
-              const isInit = await isUserProfileInitialized(currentUser.uid);
-              if (!isInit) {
-                // If local items exist in storage, save those first
-                if (parsedItems.length > 0) {
-                  for (const localItem of parsedItems) {
-                    await saveFirestoreFinancialItem(currentUser.uid, localItem as any);
-                  }
-                } else {
-                  // Brand new user: seed sample items
-                  for (const sample of SAMPLE_ITEMS) {
-                    await saveFirestoreFinancialItem(currentUser.uid, sample as any);
-                  }
-                }
-                await markUserProfileInitialized(currentUser.uid);
-              } else {
-                setItems([]);
-                localStorage.setItem('finmob_local_items', JSON.stringify([]));
-                setSyncState('synced');
-              }
-            } else {
-              setItems(remoteItems);
-              localStorage.setItem('finmob_local_items', JSON.stringify(remoteItems));
-              setSyncState('synced');
-              markUserProfileInitialized(currentUser.uid);
-            }
+          (remoteItems) => {
+            setItems(remoteItems);
+            localStorage.setItem('finmob_local_items', JSON.stringify(remoteItems));
+            setSyncState('synced');
+            markUserProfileInitialized(currentUser.uid);
           },
           (err) => {
             console.warn('Firestore items sync warning:', err);
@@ -274,73 +232,21 @@ export default function App() {
         // Subscribe to real-time Transactions collection
         unsubscribeTxs = subscribeToUserTransactions(
           currentUser.uid,
-          async (remoteTxs) => {
-            if (remoteTxs.length === 0) {
-              const isInit = await isUserProfileInitialized(currentUser.uid);
-              if (!isInit) {
-                if (parsedTxs.length > 0) {
-                  for (const localTx of parsedTxs) {
-                    await saveFirestoreTransaction(currentUser.uid, localTx as any);
-                  }
-                } else {
-                  for (const sampleTx of SAMPLE_TRANSACTIONS) {
-                    await saveFirestoreTransaction(currentUser.uid, sampleTx as any);
-                  }
-                }
-              } else {
-                setTransactions([]);
-                localStorage.setItem('finmob_local_txs', JSON.stringify([]));
-              }
-            } else {
-              setTransactions(remoteTxs);
-              localStorage.setItem('finmob_local_txs', JSON.stringify(remoteTxs));
-            }
+          (remoteTxs) => {
+            setTransactions(remoteTxs);
+            localStorage.setItem('finmob_local_txs', JSON.stringify(remoteTxs));
           },
           (err) => {
             console.warn('Firestore transactions sync warning:', err);
           }
         );
       } else {
-        // Sign in anonymously to enable seamless cloud sync
-        try {
-          await signInAnonymously(auth);
-        } catch (e) {
-          console.warn('Anonymous auth fallback to localStorage:', e);
-          setUser(null);
-          setSyncState('guest');
-
-          // Local storage fallback for items
-          const localItems = localStorage.getItem('finmob_local_items');
-          if (localItems) {
-            try {
-              setItems(JSON.parse(localItems));
-            } catch {
-              const initial = SAMPLE_ITEMS.map((s, idx) => ({ ...s, id: `local_${idx}`, userId: 'guest' }));
-              setItems(initial);
-              localStorage.setItem('finmob_local_items', JSON.stringify(initial));
-            }
-          } else {
-            const initial = SAMPLE_ITEMS.map((s, idx) => ({ ...s, id: `local_${idx}`, userId: 'guest' }));
-            setItems(initial);
-            localStorage.setItem('finmob_local_items', JSON.stringify(initial));
-          }
-
-          // Local storage fallback for transactions
-          const localTxs = localStorage.getItem('finmob_local_txs');
-          if (localTxs) {
-            try {
-              setTransactions(JSON.parse(localTxs));
-            } catch {
-              const initialTxs = SAMPLE_TRANSACTIONS.map((t, idx) => ({ ...t, id: `localtx_${idx}`, userId: 'guest' }));
-              setTransactions(initialTxs);
-              localStorage.setItem('finmob_local_txs', JSON.stringify(initialTxs));
-            }
-          } else {
-            const initialTxs = SAMPLE_TRANSACTIONS.map((t, idx) => ({ ...t, id: `localtx_${idx}`, userId: 'guest' }));
-            setTransactions(initialTxs);
-            localStorage.setItem('finmob_local_txs', JSON.stringify(initialTxs));
-          }
-        }
+        setUser(null);
+        setSyncState('guest');
+        setItems([]);
+        setTransactions([]);
+        localStorage.removeItem('finmob_local_items');
+        localStorage.removeItem('finmob_local_txs');
       }
     });
 
@@ -589,6 +495,33 @@ export default function App() {
   const handleOpenTransactions = (item: FinancialItem) => {
     setLedgerItem(item);
   };
+
+  // 1. Initial Auth Verification Loader Screen
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-white flex flex-col items-center justify-center p-6 space-y-4 selection:bg-emerald-500 selection:text-white">
+        <div className="relative">
+          <div className="h-16 w-16 rounded-3xl bg-slate-900 border border-slate-700/80 shadow-2xl shadow-emerald-500/20 flex items-center justify-center">
+            <img src="/icon.svg" alt="MYFIN" className="h-10 w-10 object-contain animate-pulse" />
+          </div>
+          <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 border-2 border-[#0B0F19] flex items-center justify-center animate-ping" />
+        </div>
+        <div className="text-center space-y-1">
+          <h1 className="text-lg font-black tracking-wider text-white">MYFIN</h1>
+          <p className="text-xs text-slate-400 font-medium">Securing financial workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated Gate: Show dedicated Sign In / Sign Up screen
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex items-center justify-center p-3 sm:p-6 selection:bg-emerald-500 selection:text-slate-950">
+        <SignIn />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col pb-24 selection:bg-indigo-500 selection:text-white">
