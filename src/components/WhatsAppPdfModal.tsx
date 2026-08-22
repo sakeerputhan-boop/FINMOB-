@@ -11,16 +11,19 @@ import {
   ShieldCheck,
   Share2,
   Sparkles,
-  KeyRound
+  KeyRound,
+  FileSpreadsheet
 } from 'lucide-react';
-import { FinancialItem, CurrencyCode } from '../types';
+import { FinancialItem, Transaction, CurrencyCode } from '../types';
 import { formatCurrency } from '../utils/currency';
 import { generateFinancialPdf } from '../utils/pdfGenerator';
+import { exportItemsToCsv, exportFullBackupCsv } from '../utils/csvExport';
 
 interface WhatsAppPdfModalProps {
   isOpen: boolean;
   onClose: () => void;
   items: FinancialItem[];
+  transactions?: Transaction[];
   currency: CurrencyCode;
 }
 
@@ -28,6 +31,7 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
   isOpen,
   onClose,
   items,
+  transactions = [],
   currency
 }) => {
   const [copied, setCopied] = useState(false);
@@ -35,6 +39,7 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [shareSuccess, setShareSuccess] = useState(false);
+  const [csvDownloaded, setCsvDownloaded] = useState(false);
 
   if (!isOpen) return null;
 
@@ -315,29 +320,49 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
           </div>
 
           {/* Main Action Buttons */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
             
             {/* WhatsApp Share Button */}
             <button
               onClick={handleWhatsAppShare}
               disabled={isGenerating}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/25 transition cursor-pointer"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/25 transition cursor-pointer active:scale-95"
             >
               <MessageSquare className="w-4 h-4 fill-white/20" />
-              <span>{isGenerating ? 'Generating PDF...' : 'Share PDF on WhatsApp'}</span>
+              <span>{isGenerating ? 'Generating...' : 'WhatsApp Share'}</span>
             </button>
 
             {/* Download Password-Protected PDF */}
             <button
               onClick={handleDownloadPdf}
               disabled={isGenerating}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/25 transition cursor-pointer"
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/25 transition cursor-pointer active:scale-95"
             >
               <Download className="w-4 h-4" />
-              <span>{password ? 'Download Protected PDF' : 'Download PDF Statement'}</span>
+              <span>{password ? 'Protected PDF' : 'Download PDF'}</span>
+            </button>
+
+            {/* Direct CSV Backup Download */}
+            <button
+              onClick={() => {
+                exportFullBackupCsv(items, transactions, currency);
+                setCsvDownloaded(true);
+                setTimeout(() => setCsvDownloaded(false), 3000);
+              }}
+              className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-extrabold text-xs border border-slate-700 shadow-md transition cursor-pointer active:scale-95"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span>Download CSV</span>
             </button>
 
           </div>
+
+          {csvDownloaded && (
+            <div className="p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold text-center animate-in fade-in flex items-center justify-center gap-2">
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>Full CSV Backup downloaded to your device!</span>
+            </div>
+          )}
 
           {shareSuccess && (
             <div className="p-2.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold text-center animate-in fade-in">

@@ -51,7 +51,10 @@ import {
   saveFinancialItem as saveFirestoreFinancialItem,
   removeFinancialItem as removeFirestoreFinancialItem,
   saveTransaction as saveFirestoreTransaction,
-  removeTransaction as removeFirestoreTransaction
+  removeTransaction as removeFirestoreTransaction,
+  isUserProfileInitialized,
+  markUserProfileInitialized,
+  migrateLocalDataToFirestore
 } from './lib/firebase';
 
 export default function App() {
@@ -191,18 +194,46 @@ export default function App() {
         });
         setSyncState('syncing');
 
+        // Check if user has offline items to migrate
+        if (!currentUser.isAnonymous) {
+          const cachedLocalItems = localStorage.getItem('finmob_local_items');
+          const cachedLocalTxs = localStorage.getItem('finmob_local_txs');
+          let parsedItems: FinancialItem[] = [];
+          let parsedTxs: Transaction[] = [];
+          try {
+            if (cachedLocalItems) parsedItems = JSON.parse(cachedLocalItems);
+            if (cachedLocalTxs) parsedTxs = JSON.parse(cachedLocalTxs);
+          } catch {}
+
+          if (parsedItems.length > 0 || parsedTxs.length > 0) {
+            await migrateLocalDataToFirestore(currentUser.uid, parsedItems, parsedTxs);
+            localStorage.removeItem('finmob_local_items');
+            localStorage.removeItem('finmob_local_txs');
+          }
+        }
+
         // Subscribe to real-time Items collection
         unsubscribeItems = subscribeToUserItems(
           currentUser.uid,
           async (remoteItems) => {
             if (remoteItems.length === 0) {
-              // Seed sample items into Firestore if brand new user
-              for (const sample of SAMPLE_ITEMS) {
-                await saveFirestoreFinancialItem(currentUser.uid, sample as any);
+              // Check if user profile has already been initialized (prevents unwanted sample re-seeding when user deletes all items)
+              const isInit = await isUserProfileInitialized(currentUser.uid);
+              if (!isInit) {
+                // First-time user only: seed sample items into Firestore
+                for (const sample of SAMPLE_ITEMS) {
+                  await saveFirestoreFinancialItem(currentUser.uid, sample as any);
+                }
+                await markUserProfileInitialized(currentUser.uid);
+              } else {
+                setItems([]);
+                setSyncState('synced');
               }
             } else {
               setItems(remoteItems);
               setSyncState('synced');
+              // Ensure user is marked initialized
+              markUserProfileInitialized(currentUser.uid);
             }
           },
           (err) => {
@@ -216,8 +247,13 @@ export default function App() {
           currentUser.uid,
           async (remoteTxs) => {
             if (remoteTxs.length === 0) {
-              for (const sampleTx of SAMPLE_TRANSACTIONS) {
-                await saveFirestoreTransaction(currentUser.uid, sampleTx as any);
+              const isInit = await isUserProfileInitialized(currentUser.uid);
+              if (!isInit) {
+                for (const sampleTx of SAMPLE_TRANSACTIONS) {
+                  await saveFirestoreTransaction(currentUser.uid, sampleTx as any);
+                }
+              } else {
+                setTransactions([]);
               }
             } else {
               setTransactions(remoteTxs);
@@ -713,7 +749,7 @@ export default function App() {
         }}
       />
 
-      {/* 6. Consolidated App Settings Modal (Categories, PIN, Currency, Holding Countries) */}
+      {/* 6. Consolidated App Settings Modal (Categories, PIN, Currency, Holding Countries, CSV Backup) */}
       <AppSettingsModal
         isOpen={isAppSettingsOpen}
         onClose={() => setIsAppSettingsOpen(false)}
@@ -734,6 +770,7 @@ export default function App() {
           setIsAuthModalOpen(true);
         }}
         items={items}
+        transactions={transactions}
         currentTheme={theme}
         onThemeChange={handleThemeChange}
       />
@@ -827,11 +864,12 @@ export default function App() {
         onClose={() => setIsDeployGuideOpen(false)}
       />
 
-      {/* 12. WhatsApp PDF Financial Report Modal */}
+      {/* 12. WhatsApp PDF Financial Report & CSV Backup Modal */}
       <WhatsAppPdfModal
         isOpen={isWhatsAppPdfOpen}
         onClose={() => setIsWhatsAppPdfOpen(false)}
         items={items}
+        transactions={transactions}
         currency={currency}
       />
 

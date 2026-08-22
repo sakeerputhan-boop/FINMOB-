@@ -41,15 +41,15 @@ const isCustomKeyValid =
   !envApiKey.includes('Dummy') &&
   !envApiKey.includes('YourApiKey');
 
-// Target Firebase Project configuration
-// Uses provided environment variables if valid, otherwise falls back to active provisioned config
+// Target Firebase Project configuration (Project: finmob-7e007)
+// Uses provided environment variables if valid, otherwise falls back to active applet config
 export const firebaseConfig = {
-  apiKey: isCustomKeyValid ? envApiKey : (appletConfig.apiKey || "AIzaSyCElFxZJS4zU3Jnyu58EHN0vuQbbV3gdCI"),
+  apiKey: isCustomKeyValid ? envApiKey : (appletConfig.apiKey || "AIzaSyCOD-r0hXW59fEM9hC-MYIPUjjLUwRFIRc"),
   authDomain: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : null) || appletConfig.authDomain || "finmob-7e007.firebaseapp.com",
   projectId: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_PROJECT_ID : null) || appletConfig.projectId || "finmob-7e007",
-  storageBucket: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : null) || appletConfig.storageBucket || "finmob-7e007.appspot.com",
+  storageBucket: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : null) || appletConfig.storageBucket || "finmob-7e007.firebasestorage.app",
   messagingSenderId: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : null) || appletConfig.messagingSenderId || "55757491863",
-  appId: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_APP_ID : null) || appletConfig.appId || "1:55757491863:web:a1b2c3d4e5f6g7h8i9j0k1",
+  appId: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_APP_ID : null) || appletConfig.appId || "1:55757491863:web:b5540a29e8cf33289ea3d2",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || appletConfig.measurementId || ""
 };
 
@@ -64,8 +64,11 @@ export const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(
 // Initialize Firebase Authentication
 export const auth: Auth = getAuth(app);
 
-// Initialize Cloud Firestore (supports optional custom databaseId if configured)
-export const db: Firestore = customDatabaseId ? getFirestore(app, customDatabaseId) : getFirestore(app);
+// Initialize Cloud Firestore (supports named database e.g. "myfin" or standard default database)
+export const db: Firestore =
+  customDatabaseId && customDatabaseId !== '(default)' && customDatabaseId !== 'default'
+    ? getFirestore(app, customDatabaseId)
+    : getFirestore(app);
 
 // Initialize Cloud Storage
 export const storage: FirebaseStorage = getStorage(app);
@@ -332,15 +335,80 @@ export function subscribeToUserSettings(
   });
 }
 
-// Save user settings
-export async function saveUserSettings(userId: string, settings: Partial<UserSettings>) {
-  const settingsRef = doc(db, 'users', userId, 'settings', 'preferences');
-  await setDoc(
-    settingsRef,
-    {
-      ...settings,
-      lastSynced: new Date().toISOString()
-    },
-    { merge: true }
-  );
+// Check if user profile has already been initialized (prevents unwanted sample data re-seeding)
+export async function isUserProfileInitialized(userId: string): Promise<boolean> {
+  try {
+    const profileRef = doc(db, 'users', userId, 'settings', 'profile');
+    const snap = await getDoc(profileRef);
+    if (snap.exists() && snap.data()?.isInitialized) {
+      return true;
+    }
+    // Also check if any items already exist
+    const itemsRef = collection(db, 'users', userId, 'items');
+    const itemsSnap = await getDocs(itemsRef);
+    if (!itemsSnap.empty) {
+      // Mark as initialized
+      await setDoc(profileRef, { isInitialized: true, lastSeen: new Date().toISOString() }, { merge: true });
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('Could not check user initialization status:', err);
+    return false;
+  }
 }
+
+// Mark user profile as initialized in Firestore
+export async function markUserProfileInitialized(userId: string) {
+  try {
+    const profileRef = doc(db, 'users', userId, 'settings', 'profile');
+    await setDoc(
+      profileRef,
+      {
+        isInitialized: true,
+        initializedAt: new Date().toISOString(),
+        lastSeen: new Date().toISOString()
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Could not mark user as initialized:', err);
+  }
+}
+
+// Seamlessly migrate guest / localStorage items and transactions into Firestore
+export async function migrateLocalDataToFirestore(
+  userId: string,
+  localItems: FinancialItem[],
+  localTxs: Transaction[]
+) {
+  try {
+    const promises: Promise<any>[] = [];
+
+    // Migrate local items
+    if (localItems && localItems.length > 0) {
+      for (const item of localItems) {
+        if (item.id && !item.id.startsWith('sample_')) {
+          const { id, createdAt, userId: _, ...itemRest } = item;
+          promises.push(saveFinancialItem(userId, { ...itemRest, id }));
+        }
+      }
+    }
+
+    // Migrate local transactions
+    if (localTxs && localTxs.length > 0) {
+      for (const tx of localTxs) {
+        if (tx.id && !tx.id.startsWith('sample_tx_')) {
+          const { id, createdAt, userId: _, ...txRest } = tx;
+          promises.push(saveTransaction(userId, { ...txRest, id }));
+        }
+      }
+    }
+
+    await Promise.allSettled(promises);
+    await markUserProfileInitialized(userId);
+  } catch (err) {
+    console.warn('Data migration warning:', err);
+  }
+}
+
