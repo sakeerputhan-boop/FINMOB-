@@ -83,6 +83,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
   const [interestRate, setInterestRate] = useState('');
   const [maturityDate, setMaturityDate] = useState('');
   const [maturityAmount, setMaturityAmount] = useState('');
+  const [isStandalone, setIsStandalone] = useState(false);
 
   // Asset / Gold
   const [assetCategory, setAssetCategory] = useState<AssetCategory>('Gold & Jewellery');
@@ -136,6 +137,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
       setInterestRate(initialItem.interestRate ? initialItem.interestRate.toString() : '');
       setMaturityDate(initialItem.maturityDate || '');
       setMaturityAmount(initialItem.maturityAmount ? initialItem.maturityAmount.toString() : '');
+      setIsStandalone(Boolean(initialItem.isStandalone));
       setAssetCategory(initialItem.assetCategory || 'Gold & Jewellery');
       setPurityOrUnits(initialItem.purityOrUnits || '');
       setPurchasePrice(initialItem.purchasePrice ? initialItem.purchasePrice.toString() : '');
@@ -176,6 +178,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
       setInterestRate('');
       setMaturityDate('');
       setMaturityAmount('');
+      setIsStandalone(false);
       setAssetCategory('Gold & Jewellery');
       setPurityOrUnits('');
       setPurchasePrice('');
@@ -266,6 +269,7 @@ export const ItemModal: React.FC<ItemModalProps> = ({
       interestRate: interestRate ? parseFloat(interestRate) : undefined,
       maturityDate: maturityDate || undefined,
       maturityAmount: maturityAmount ? parseFloat(maturityAmount) : undefined,
+      isStandalone: type === 'fixed_deposit' ? isStandalone : undefined,
       assetCategory: type === 'asset' ? assetCategory : undefined,
       purityOrUnits: purityOrUnits.trim() || undefined,
       purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
@@ -949,9 +953,58 @@ export const ItemModal: React.FC<ItemModalProps> = ({
 
           {/* FIXED DEPOSIT SPECIFIC */}
           {type === 'fixed_deposit' && (
-            <div className="p-3.5 rounded-xl bg-slate-950/90 border border-purple-900/40 space-y-2.5">
-              <label className="text-[10px] font-bold uppercase text-purple-400">Fixed Deposit Yield</label>
-              <div className="grid grid-cols-2 gap-2.5">
+            <div className="p-3.5 rounded-xl bg-slate-950/90 border border-purple-900/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-bold uppercase text-purple-400">FD Accounting Mode</label>
+                <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${
+                  isStandalone
+                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                }`}>
+                  {isStandalone ? 'Valuation Only (Stand Alone)' : 'Consolidated with Wealth'}
+                </span>
+              </div>
+
+              {/* Toggle Buttons: Consolidate vs Stand Alone */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsStandalone(false)}
+                  className={`p-2.5 rounded-xl text-left border transition ${
+                    !isStandalone
+                      ? 'bg-purple-600/30 border-purple-500 text-white shadow-md'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-bold text-xs">
+                    <span>Consolidate</span>
+                    {!isStandalone && <Sparkles className="w-3.5 h-3.5 text-purple-400" />}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                    Include in total wealth & net worth calculations
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsStandalone(true)}
+                  className={`p-2.5 rounded-xl text-left border transition ${
+                    isStandalone
+                      ? 'bg-indigo-600/30 border-indigo-500 text-white shadow-md'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-bold text-xs">
+                    <span>Stand Alone</span>
+                    {isStandalone && <Sparkles className="w-3.5 h-3.5 text-indigo-400" />}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+                    Valuation only (isolated locked investment)
+                  </p>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <div>
                   <label className="text-[10px] text-slate-400 block mb-1">Annual Yield (% p.a.)</label>
                   <input

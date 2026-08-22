@@ -36,7 +36,9 @@ import { THEMES, getSavedTheme, saveTheme } from '../utils/theme';
 import {
   exportItemsToCsv,
   exportTransactionsToCsv,
-  exportFullBackupCsv
+  exportFullBackupCsv,
+  exportCountryWiseCsv,
+  exportCategoryExpensesToCsv
 } from '../utils/csvExport';
 import {
   CategoryItem,
@@ -516,7 +518,7 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
                   <span>Download Spreadsheet (CSV) Ledgers</span>
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {/* 1. Full Master Backup */}
                   <button
                     onClick={() => {
@@ -536,7 +538,45 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
                     </p>
                   </button>
 
-                  {/* 2. Accounts Only */}
+                  {/* 2. Country-Wise Wealth CSV (Unconsolidated) */}
+                  <button
+                    onClick={() => {
+                      exportCountryWiseCsv(items, currency);
+                      setBackupSuccess('Country-Wise Wealth CSV report downloaded successfully!');
+                      setTimeout(() => setBackupSuccess(null), 3000);
+                    }}
+                    className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left transition group active:scale-95"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Coins className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition" />
+                      <Download className="w-4 h-4 text-slate-400 group-hover:text-cyan-400" />
+                    </div>
+                    <h5 className="text-xs font-black text-white">Country-Wise CSV</h5>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Segregated country accounts, banks & assets
+                    </p>
+                  </button>
+
+                  {/* 3. Category Expenses CSV */}
+                  <button
+                    onClick={() => {
+                      exportCategoryExpensesToCsv(transactions, currency);
+                      setBackupSuccess('Category Expense CSV report downloaded successfully!');
+                      setTimeout(() => setBackupSuccess(null), 3000);
+                    }}
+                    className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left transition group active:scale-95"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Receipt className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition" />
+                      <Download className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" />
+                    </div>
+                    <h5 className="text-xs font-black text-white">Category Expense CSV</h5>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Spend summaries grouped by category & % share
+                    </p>
+                  </button>
+
+                  {/* 4. Accounts Only */}
                   <button
                     onClick={() => {
                       exportItemsToCsv(items, currency);
@@ -546,16 +586,16 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
                     className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left transition group active:scale-95"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <Coins className="w-5 h-5 text-cyan-400 group-hover:scale-110 transition" />
-                      <Download className="w-4 h-4 text-slate-400 group-hover:text-cyan-400" />
+                      <Coins className="w-5 h-5 text-emerald-400 group-hover:scale-110 transition" />
+                      <Download className="w-4 h-4 text-slate-400 group-hover:text-emerald-400" />
                     </div>
-                    <h5 className="text-xs font-black text-white">Accounts CSV</h5>
+                    <h5 className="text-xs font-black text-white">Accounts Registry CSV</h5>
                     <p className="text-[10px] text-slate-400 mt-0.5">
                       Banks, cash, cards, loans & gold holdings
                     </p>
                   </button>
 
-                  {/* 3. Transactions Only */}
+                  {/* 5. Transactions Only */}
                   <button
                     onClick={() => {
                       exportTransactionsToCsv(transactions, currency);
@@ -565,10 +605,10 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
                     className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-left transition group active:scale-95"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <Receipt className="w-5 h-5 text-indigo-400 group-hover:scale-110 transition" />
-                      <Download className="w-4 h-4 text-slate-400 group-hover:text-indigo-400" />
+                      <Receipt className="w-5 h-5 text-amber-400 group-hover:scale-110 transition" />
+                      <Download className="w-4 h-4 text-slate-400 group-hover:text-amber-400" />
                     </div>
-                    <h5 className="text-xs font-black text-white">Transactions CSV</h5>
+                    <h5 className="text-xs font-black text-white">Transactions Log CSV</h5>
                     <p className="text-[10px] text-slate-400 mt-0.5">
                       Chronological ledger of all spends & payments
                     </p>

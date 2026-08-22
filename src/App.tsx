@@ -514,6 +514,15 @@ export default function App() {
     }
   };
 
+  const handleToggleFdConsolidation = (item: FinancialItem) => {
+    const updatedItem: FinancialItem = {
+      ...item,
+      isStandalone: !item.isStandalone,
+      updatedAt: new Date().toISOString()
+    };
+    handleSaveItem(updatedItem);
+  };
+
   // Navigation & Modal triggers
   const handleOpenAddModal = (type: ItemType = 'bank_account') => {
     if (type === 'gift' || type === 'iou') {
@@ -681,6 +690,7 @@ export default function App() {
             }
             onEditItem={handleOpenEditModal}
             onDeleteItem={(item) => setItemToDelete(item)}
+            onToggleConsolidation={handleToggleFdConsolidation}
           />
         )}
 

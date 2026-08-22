@@ -67,6 +67,7 @@ export interface FinancialItem {
   interestRate?: number;
   maturityDate?: string;
   maturityAmount?: number;
+  isStandalone?: boolean; // If true: Stand-alone (valuation only). If false/undefined: Consolidated with wealth/net worth.
   
   // Asset / Gold details
   assetCategory?: AssetCategory;
