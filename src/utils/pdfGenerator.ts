@@ -256,12 +256,14 @@ export function generateFinancialPdf({
         const flag = cConfig?.flag || '🌐';
 
         const banks = cItems.filter((i) => i.type === 'bank_account' || i.type === 'cash_entry');
-        const fdsAndAssets = cItems.filter((i) => i.type === 'fixed_deposit' || i.type === 'asset');
+        const consolidatedFds = cItems.filter((i) => i.type === 'fixed_deposit' && !i.isStandalone);
+        const assets = cItems.filter((i) => i.type === 'asset');
         const cardsAndLoans = cItems.filter((i) => i.type === 'credit_card' || i.type === 'emi_loan');
 
         const liquid = banks.reduce((acc, i) => acc + i.amount, 0);
-        const assets = fdsAndAssets.reduce((acc, i) => acc + i.amount, 0);
-        const gross = liquid + assets;
+        const consolidatedFdTotal = consolidatedFds.reduce((acc, i) => acc + i.amount, 0);
+        const assetTotal = assets.reduce((acc, i) => acc + i.amount, 0);
+        const gross = liquid + consolidatedFdTotal + assetTotal;
         const liab = cardsAndLoans.reduce((acc, i) => acc + i.amount, 0);
         const net = gross - liab;
 
@@ -269,7 +271,7 @@ export function generateFinancialPdf({
           `${flag} ${cName}`,
           cCurr,
           formatCurrency(liquid, cCurr),
-          formatCurrency(assets, cCurr),
+          formatCurrency(consolidatedFdTotal + assetTotal, cCurr),
           formatCurrency(gross, cCurr),
           formatCurrency(liab, cCurr),
           formatCurrency(net, cCurr),
@@ -283,7 +285,7 @@ export function generateFinancialPdf({
             'Country',
             'Currency',
             'Liquid & Bank',
-            'FDs & Assets',
+            'Consolidated FDs & Assets',
             'Gross Wealth',
             'Liabilities & Debt',
             'Country Net Position',
@@ -321,15 +323,21 @@ export function generateFinancialPdf({
       const bankItems = cItems.filter((i) => i.type === 'bank_account');
       const cashItems = cItems.filter((i) => i.type === 'cash_entry');
       const fdItems = cItems.filter((i) => i.type === 'fixed_deposit');
+      const consolidatedFdItems = fdItems.filter((i) => !i.isStandalone);
+      const standaloneFdItems = fdItems.filter((i) => Boolean(i.isStandalone));
       const assetItems = cItems.filter((i) => i.type === 'asset');
       const cardItems = cItems.filter((i) => i.type === 'credit_card');
       const loanItems = cItems.filter((i) => i.type === 'emi_loan');
 
       const totalBank = bankItems.reduce((acc, i) => acc + i.amount, 0);
       const totalCash = cashItems.reduce((acc, i) => acc + i.amount, 0);
+      const totalConsolidatedFD = consolidatedFdItems.reduce((acc, i) => acc + i.amount, 0);
+      const totalStandaloneFD = standaloneFdItems.reduce((acc, i) => acc + i.amount, 0);
       const totalFD = fdItems.reduce((acc, i) => acc + i.amount, 0);
       const totalAssets = assetItems.reduce((acc, i) => acc + i.amount, 0);
-      const grossWealth = totalBank + totalCash + totalFD + totalAssets;
+      
+      // Gross Wealth correctly includes Liquid + Consolidated FDs + Assets
+      const grossWealth = totalBank + totalCash + totalConsolidatedFD + totalAssets;
 
       const totalCards = cardItems.reduce((acc, i) => acc + i.amount, 0);
       const totalLoans = loanItems.reduce((acc, i) => acc + i.amount, 0);
@@ -370,9 +378,10 @@ export function generateFinancialPdf({
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 116, 139);
+      const fdNote = totalStandaloneFD > 0 ? ` (Standalone FDs: ${formatCurrency(totalStandaloneFD, cCurr)})` : '';
       doc.text(
-        `Gross Assets: ${formatCurrency(grossWealth, cCurr)}   |   Liabilities: ${formatCurrency(totalLiabilities, cCurr)}`,
-        100,
+        `Gross Assets: ${formatCurrency(grossWealth, cCurr)}   |   Liabilities: ${formatCurrency(totalLiabilities, cCurr)}${fdNote}`,
+        96,
         currentY + 22
       );
 
@@ -418,13 +427,18 @@ export function generateFinancialPdf({
         formatCurrency(f.amount, f.currency || cCurr),
       ]);
 
+      const fdTotalLabel =
+        totalStandaloneFD > 0
+          ? `${formatCurrency(totalFD, cCurr)} (${formatCurrency(totalConsolidatedFD, cCurr)} Consolidated in Net Position)`
+          : formatCurrency(totalFD, cCurr);
+
       renderTable(
         `${cName} - Fixed Deposit (FD) Investments`,
         ['FD Title', 'Bank / Provider', 'Interest Rate', 'Maturity Date', 'Accounting Mode', `Deposit Amount (${cCurr})`],
         fdRows,
         [147, 51, 234], // Purple
         `Total Fixed Deposits (${cName})`,
-        formatCurrency(totalFD, cCurr)
+        fdTotalLabel
       );
 
       // C. Gold & Assets for this country

@@ -127,11 +127,14 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
       else if (item.type === 'emi_loan') data.loans.push(item);
     });
 
-    // Calculate totals for each country
+    // Calculate totals for each country (respecting Consolidated vs Stand-Alone FDs)
     map.forEach((data) => {
       const liquid = [...data.banks, ...data.cash].reduce((acc, i) => acc + i.amount, 0);
-      const holding = [...data.fds, ...data.assets].reduce((acc, i) => acc + i.amount, 0);
-      data.grossAssets = liquid + holding;
+      const consolidatedFds = data.fds.filter((f) => !f.isStandalone);
+      const consolidatedFdTotal = consolidatedFds.reduce((acc, i) => acc + i.amount, 0);
+      const assetTotal = data.assets.reduce((acc, i) => acc + i.amount, 0);
+
+      data.grossAssets = liquid + consolidatedFdTotal + assetTotal;
       data.liabilities = [...data.cards, ...data.loans].reduce((acc, i) => acc + i.amount, 0);
       data.netWorth = data.grossAssets - data.liabilities;
     });
@@ -246,7 +249,8 @@ export const WhatsAppPdfModal: React.FC<WhatsAppPdfModalProps> = ({
           if (data.fds.length > 0) {
             report += `  🔒 *Fixed Deposits*:\n`;
             data.fds.forEach((f) => {
-              report += `    • FD: ${f.title} - ${formatCurrency(f.amount, f.currency || cCurr)} (${f.interestRate || 0}% p.a.)\n`;
+              const modeTag = f.isStandalone ? ' [Stand-Alone]' : ' [Consolidated in Net Position]';
+              report += `    • FD: ${f.title} - ${formatCurrency(f.amount, f.currency || cCurr)} (${f.interestRate || 0}% p.a.)${modeTag}\n`;
             });
           }
 

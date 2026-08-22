@@ -5,6 +5,7 @@ import {
   CreditCard,
   Building,
   Coins,
+  PiggyBank,
   ArrowUpRight,
   ArrowDownRight,
   CheckCircle2,
@@ -67,7 +68,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
-            Independent summaries for Accounts, Credit Cards, and Loans per country currency
+            Independent summaries for Accounts, Fixed Deposits, Assets, Cards, and Loans per country currency
           </p>
         </div>
 
@@ -101,6 +102,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           const totalCash = cashItems.reduce((acc, i) => acc + i.amount, 0);
           const totalLiquid = totalBank + totalCash;
 
+          // Country Fixed Deposits (Consolidated vs Stand-Alone)
+          const fdItems = countryItems.filter((i) => i.type === 'fixed_deposit');
+          const consolidatedFdItems = fdItems.filter((i) => !i.isStandalone);
+          const standaloneFdItems = fdItems.filter((i) => Boolean(i.isStandalone));
+          const totalConsolidatedFd = consolidatedFdItems.reduce((acc, i) => acc + i.amount, 0);
+          const totalStandaloneFd = standaloneFdItems.reduce((acc, i) => acc + i.amount, 0);
+          const totalFd = fdItems.reduce((acc, i) => acc + i.amount, 0);
+
+          // Country Physical Assets (Gold, Land, etc.)
+          const assetItems = countryItems.filter((i) => i.type === 'asset');
+          const totalAssets = assetItems.reduce((acc, i) => acc + i.amount, 0);
+
           // Country Credit Cards
           const cardItems = countryItems.filter((i) => i.type === 'credit_card');
           const totalCardDue = cardItems.reduce((acc, i) => acc + i.amount, 0);
@@ -113,8 +126,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           const emiLoans = loanItems.filter((i) => (i.loanType || 'emi') === 'emi');
           const totalMonthlyEmi = emiLoans.reduce((acc, i) => acc + (i.monthlyEmi || 0), 0);
 
-          // Net position in this native currency
-          const countryNet = totalLiquid - (totalCardDue + totalLoanDue);
+          // Gross Assets = Liquid + Consolidated FDs + Assets
+          const countryGross = totalLiquid + totalConsolidatedFd + totalAssets;
+          const totalLiabilities = totalCardDue + totalLoanDue;
+
+          // Country Net position (Consolidated FDs directly effect this net position)
+          const countryNet = countryGross - totalLiabilities;
+          const hasFdOrAssets = totalFd > 0 || totalAssets > 0;
 
           return (
             <div
@@ -133,7 +151,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </span>
                     </div>
                     <p className="text-xs text-slate-400">
-                      Independent position for {countryName} accounts & liabilities
+                      Gross: {formatCurrency(countryGross, nativeCurrency)} {totalConsolidatedFd > 0 ? `(incl. ${formatCurrency(totalConsolidatedFd, nativeCurrency)} FDs)` : ''} • Liabilities: {formatCurrency(totalLiabilities, nativeCurrency)}
                     </p>
                   </div>
                 </div>
@@ -153,9 +171,101 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
               </div>
 
-              {/* 3 Country Metrics Pillars: Accounts, Credit Cards, Loans */}
+              {/* Country Metrics Pillars */}
               <div className="p-4 sm:p-5">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 mb-5">
+                <div className={`grid grid-cols-1 ${hasFdOrAssets ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3.5 mb-5`}>
+                  
+                  {/* 1. Accounts Metric */}
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+                    <div className="flex items-center justify-between text-indigo-400 text-[10px] font-bold uppercase">
+                      <span>1. Bank & Cash</span>
+                      <Building2 className="w-4 h-4 text-indigo-400" />
+                    </div>
+                    <div className="text-lg font-black text-emerald-400 font-mono mt-1">
+                      {formatCurrency(totalLiquid, nativeCurrency)}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1 flex justify-between">
+                      <span>{bankItems.length} Bank, {cashItems.length} Cash</span>
+                      <button
+                        onClick={() => onNavigateTab('accounts')}
+                        className="text-indigo-400 hover:underline font-bold"
+                      >
+                        View →
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2. FDs & Assets (if present) */}
+                  {hasFdOrAssets && (
+                    <div className="bg-slate-950/80 p-3.5 rounded-xl border border-purple-900/40">
+                      <div className="flex items-center justify-between text-purple-400 text-[10px] font-bold uppercase">
+                        <span>2. FDs & Assets</span>
+                        <PiggyBank className="w-4 h-4 text-purple-400" />
+                      </div>
+                      <div className="text-lg font-black text-purple-300 font-mono mt-1">
+                        {formatCurrency(totalConsolidatedFd + totalAssets, nativeCurrency)}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-1 flex justify-between">
+                        <span>
+                          {totalConsolidatedFd > 0 ? `${formatCurrency(totalConsolidatedFd, nativeCurrency)} FDs` : `${assetItems.length} Assets`}
+                          {totalStandaloneFd > 0 ? ` (${formatCurrency(totalStandaloneFd, nativeCurrency)} stand-alone)` : ''}
+                        </span>
+                        <button
+                          onClick={() => onNavigateTab('assets')}
+                          className="text-purple-400 hover:underline font-bold"
+                        >
+                          View →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Credit Cards Metric */}
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+                    <div className="flex items-center justify-between text-cyan-400 text-[10px] font-bold uppercase">
+                      <span>{hasFdOrAssets ? '3. Credit Cards' : '2. Credit Cards'}</span>
+                      <CreditCard className="w-4 h-4 text-cyan-400" />
+                    </div>
+                    <div className="text-lg font-black text-rose-400 font-mono mt-1">
+                      {formatCurrency(totalCardDue, nativeCurrency)}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1 flex justify-between">
+                      <span>Limit: {formatCurrency(totalCardLimit, nativeCurrency)}</span>
+                      <button
+                        onClick={() => onNavigateTab('cards')}
+                        className="text-cyan-400 hover:underline font-bold"
+                      >
+                        View →
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 4. Loans Metric */}
+                  <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+                    <div className="flex items-center justify-between text-rose-400 text-[10px] font-bold uppercase">
+                      <span>{hasFdOrAssets ? '4. Active Loans' : '3. Active Loans'}</span>
+                      <Building className="w-4 h-4 text-rose-400" />
+                    </div>
+                    <div className="text-lg font-black text-rose-400 font-mono mt-1">
+                      {formatCurrency(totalLoanDue, nativeCurrency)}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1 flex justify-between">
+                      <span>
+                        {totalMonthlyEmi > 0 ? `EMI: ${formatCurrency(totalMonthlyEmi, nativeCurrency)}/mo` : `${loanItems.length} Active`}
+                      </span>
+                      <button
+                        onClick={() => onNavigateTab('loans')}
+                        className="text-rose-400 hover:underline font-bold"
+                      >
+                        View →
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Country Items Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs">
                   
                   {/* 1. Accounts Metric */}
                   <div className="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
