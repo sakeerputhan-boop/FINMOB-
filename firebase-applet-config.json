@@ -3,10 +3,10 @@
   "appId": "1:55757491863:web:b5540a29e8cf33289ea3d2",
   "apiKey": "AIzaSyCOD-r0hXW59fEM9hC-MYIPUjjLUwRFIRc",
   "authDomain": "finmob-7e007.firebaseapp.com",
-  "firestoreDatabaseId": "myfin",
+  "firestoreDatabaseId": "(default)",
   "storageBucket": "finmob-7e007.firebasestorage.app",
   "messagingSenderId": "55757491863",
-  "measurementId": "",
+  "measurementId": "G-S6DC6C0RSB",
   "oAuthClientId": "55757491863-626fi1vv0j8l9eq0laeulbsdlune6b99.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }

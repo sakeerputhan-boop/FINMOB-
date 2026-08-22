@@ -60,8 +60,34 @@ import {
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [syncState, setSyncState] = useState<SyncState>('syncing');
-  const [items, setItems] = useState<FinancialItem[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [items, setItems] = useState<FinancialItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('finmob_local_items');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    const initial = SAMPLE_ITEMS.map((s, idx) => ({ ...s, id: `local_${idx}`, userId: 'guest' }));
+    try {
+      localStorage.setItem('finmob_local_items', JSON.stringify(initial));
+    } catch {}
+    return initial;
+  });
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    try {
+      const cached = localStorage.getItem('finmob_local_txs');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    const initialTxs = SAMPLE_TRANSACTIONS.map((t, idx) => ({ ...t, id: `localtx_${idx}`, userId: 'guest' }));
+    try {
+      localStorage.setItem('finmob_local_txs', JSON.stringify(initialTxs));
+    } catch {}
+    return initialTxs;
+  });
   const [currency, setCurrency] = useState<CurrencyCode>('AED');
   const [selectedCountry, setSelectedCountry] = useState<string>('ALL');
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
@@ -194,22 +220,18 @@ export default function App() {
         });
         setSyncState('syncing');
 
-        // Check if user has offline items to migrate
-        if (!currentUser.isAnonymous) {
-          const cachedLocalItems = localStorage.getItem('finmob_local_items');
-          const cachedLocalTxs = localStorage.getItem('finmob_local_txs');
-          let parsedItems: FinancialItem[] = [];
-          let parsedTxs: Transaction[] = [];
-          try {
-            if (cachedLocalItems) parsedItems = JSON.parse(cachedLocalItems);
-            if (cachedLocalTxs) parsedTxs = JSON.parse(cachedLocalTxs);
-          } catch {}
+        // Check if user has local items/txs in localStorage to migrate to Firestore
+        const cachedLocalItems = localStorage.getItem('finmob_local_items');
+        const cachedLocalTxs = localStorage.getItem('finmob_local_txs');
+        let parsedItems: FinancialItem[] = [];
+        let parsedTxs: Transaction[] = [];
+        try {
+          if (cachedLocalItems) parsedItems = JSON.parse(cachedLocalItems);
+          if (cachedLocalTxs) parsedTxs = JSON.parse(cachedLocalTxs);
+        } catch {}
 
-          if (parsedItems.length > 0 || parsedTxs.length > 0) {
-            await migrateLocalDataToFirestore(currentUser.uid, parsedItems, parsedTxs);
-            localStorage.removeItem('finmob_local_items');
-            localStorage.removeItem('finmob_local_txs');
-          }
+        if (parsedItems.length > 0 || parsedTxs.length > 0) {
+          await migrateLocalDataToFirestore(currentUser.uid, parsedItems, parsedTxs);
         }
 
         // Subscribe to real-time Items collection
@@ -217,22 +239,29 @@ export default function App() {
           currentUser.uid,
           async (remoteItems) => {
             if (remoteItems.length === 0) {
-              // Check if user profile has already been initialized (prevents unwanted sample re-seeding when user deletes all items)
               const isInit = await isUserProfileInitialized(currentUser.uid);
               if (!isInit) {
-                // First-time user only: seed sample items into Firestore
-                for (const sample of SAMPLE_ITEMS) {
-                  await saveFirestoreFinancialItem(currentUser.uid, sample as any);
+                // If local items exist in storage, save those first
+                if (parsedItems.length > 0) {
+                  for (const localItem of parsedItems) {
+                    await saveFirestoreFinancialItem(currentUser.uid, localItem as any);
+                  }
+                } else {
+                  // Brand new user: seed sample items
+                  for (const sample of SAMPLE_ITEMS) {
+                    await saveFirestoreFinancialItem(currentUser.uid, sample as any);
+                  }
                 }
                 await markUserProfileInitialized(currentUser.uid);
               } else {
                 setItems([]);
+                localStorage.setItem('finmob_local_items', JSON.stringify([]));
                 setSyncState('synced');
               }
             } else {
               setItems(remoteItems);
+              localStorage.setItem('finmob_local_items', JSON.stringify(remoteItems));
               setSyncState('synced');
-              // Ensure user is marked initialized
               markUserProfileInitialized(currentUser.uid);
             }
           },
@@ -249,14 +278,22 @@ export default function App() {
             if (remoteTxs.length === 0) {
               const isInit = await isUserProfileInitialized(currentUser.uid);
               if (!isInit) {
-                for (const sampleTx of SAMPLE_TRANSACTIONS) {
-                  await saveFirestoreTransaction(currentUser.uid, sampleTx as any);
+                if (parsedTxs.length > 0) {
+                  for (const localTx of parsedTxs) {
+                    await saveFirestoreTransaction(currentUser.uid, localTx as any);
+                  }
+                } else {
+                  for (const sampleTx of SAMPLE_TRANSACTIONS) {
+                    await saveFirestoreTransaction(currentUser.uid, sampleTx as any);
+                  }
                 }
               } else {
                 setTransactions([]);
+                localStorage.setItem('finmob_local_txs', JSON.stringify([]));
               }
             } else {
               setTransactions(remoteTxs);
+              localStorage.setItem('finmob_local_txs', JSON.stringify(remoteTxs));
             }
           },
           (err) => {
@@ -278,7 +315,9 @@ export default function App() {
             try {
               setItems(JSON.parse(localItems));
             } catch {
-              setItems(SAMPLE_ITEMS.map((s, idx) => ({ ...s, id: `local_${idx}`, userId: 'guest' })));
+              const initial = SAMPLE_ITEMS.map((s, idx) => ({ ...s, id: `local_${idx}`, userId: 'guest' }));
+              setItems(initial);
+              localStorage.setItem('finmob_local_items', JSON.stringify(initial));
             }
           } else {
             const initial = SAMPLE_ITEMS.map((s, idx) => ({ ...s, id: `local_${idx}`, userId: 'guest' }));
@@ -292,7 +331,9 @@ export default function App() {
             try {
               setTransactions(JSON.parse(localTxs));
             } catch {
-              setTransactions(SAMPLE_TRANSACTIONS.map((t, idx) => ({ ...t, id: `localtx_${idx}`, userId: 'guest' })));
+              const initialTxs = SAMPLE_TRANSACTIONS.map((t, idx) => ({ ...t, id: `localtx_${idx}`, userId: 'guest' }));
+              setTransactions(initialTxs);
+              localStorage.setItem('finmob_local_txs', JSON.stringify(initialTxs));
             }
           } else {
             const initialTxs = SAMPLE_TRANSACTIONS.map((t, idx) => ({ ...t, id: `localtx_${idx}`, userId: 'guest' }));
@@ -315,57 +356,47 @@ export default function App() {
     itemData: Partial<FinancialItem> & { title: string; amount: number; type: any }
   ) => {
     const nowIso = new Date().toISOString();
-    const itemWithTimestamp: Partial<FinancialItem> & { title: string; amount: number; type: any } = {
+    const itemId = itemData.id || `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const fullItem: FinancialItem = {
       ...itemData,
-      lastUsedAt: nowIso,
-      updatedAt: nowIso
-    };
+      id: itemId,
+      userId: user ? user.uid : 'guest',
+      createdAt: itemData.createdAt || nowIso,
+      updatedAt: nowIso,
+      lastUsedAt: nowIso
+    } as FinancialItem;
 
-    if (itemData.id && itemData.type === 'credit_card') {
-      recordLastUsedCard(itemData.id);
+    if (fullItem.id && fullItem.type === 'credit_card') {
+      recordLastUsedCard(fullItem.id);
     }
-    if (itemData.id) {
-      recordLastUsedItem(itemData.id, itemData.type);
+    if (fullItem.id) {
+      recordLastUsedItem(fullItem.id, fullItem.type);
     }
-    if (itemData.reminderCategory) {
-      recordLastUsedCategory(itemData.reminderCategory, 'reminder');
+    if (fullItem.reminderCategory) {
+      recordLastUsedCategory(fullItem.reminderCategory, 'reminder');
     }
-    if (itemData.assetCategory) {
-      recordLastUsedCategory(itemData.assetCategory, 'asset');
+    if (fullItem.assetCategory) {
+      recordLastUsedCategory(fullItem.assetCategory, 'asset');
     }
 
+    // 1. Immediately & optimistically update local state & localStorage
+    setItems((prevItems) => {
+      const exists = prevItems.some((i) => i.id === fullItem.id);
+      const updated = exists ? prevItems.map((i) => (i.id === fullItem.id ? fullItem : i)) : [fullItem, ...prevItems];
+      localStorage.setItem('finmob_local_items', JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Sync to Firestore if authenticated
     if (user) {
       try {
         setSyncState('syncing');
-        await saveFirestoreFinancialItem(user.uid, itemWithTimestamp);
+        await saveFirestoreFinancialItem(user.uid, fullItem);
         setSyncState('synced');
       } catch (err) {
         console.error('Failed to save to Firestore:', err);
         setSyncState('offline');
       }
-    } else {
-      let updatedItems: FinancialItem[] = [];
-      if (itemData.id) {
-        updatedItems = items.map((i) =>
-          i.id === itemData.id ? { ...i, ...itemWithTimestamp } : i
-        );
-      } else {
-        const newItem: FinancialItem = {
-          ...itemWithTimestamp,
-          id: `local_${Date.now()}`,
-          userId: 'guest',
-          createdAt: nowIso,
-          updatedAt: nowIso,
-          lastUsedAt: nowIso
-        };
-        if (newItem.type === 'credit_card') {
-          recordLastUsedCard(newItem.id);
-        }
-        recordLastUsedItem(newItem.id, newItem.type);
-        updatedItems = [newItem, ...items];
-      }
-      setItems(updatedItems);
-      localStorage.setItem('finmob_local_items', JSON.stringify(updatedItems));
     }
   };
 
@@ -374,6 +405,14 @@ export default function App() {
     if (!itemToDelete) return;
     const id = itemToDelete.id;
 
+    // 1. Immediately & optimistically update local state & localStorage
+    setItems((prevItems) => {
+      const updated = prevItems.filter((i) => i.id !== id);
+      localStorage.setItem('finmob_local_items', JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Sync deletion to Firestore if authenticated
     if (user) {
       try {
         setSyncState('syncing');
@@ -383,10 +422,6 @@ export default function App() {
         console.error('Failed to delete from Firestore:', err);
         setSyncState('offline');
       }
-    } else {
-      const updated = items.filter((i) => i.id !== id);
-      setItems(updated);
-      localStorage.setItem('finmob_local_items', JSON.stringify(updated));
     }
 
     setItemToDelete(null);
@@ -397,16 +432,20 @@ export default function App() {
     if (!txToDelete) return;
     const id = txToDelete.id;
 
+    // 1. Immediately & optimistically update local state & localStorage
+    setTransactions((prevTxs) => {
+      const updated = prevTxs.filter((t) => t.id !== id);
+      localStorage.setItem('finmob_local_txs', JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Sync deletion to Firestore if authenticated
     if (user) {
       try {
         await removeFirestoreTransaction(user.uid, id);
       } catch (err) {
         console.error('Failed to delete transaction from Firestore:', err);
       }
-    } else {
-      const updated = transactions.filter((t) => t.id !== id);
-      setTransactions(updated);
-      localStorage.setItem('finmob_local_txs', JSON.stringify(updated));
     }
 
     setTxToDelete(null);
@@ -447,9 +486,9 @@ export default function App() {
       ? { ...updatedSourceItem, lastUsedAt: nowIso, updatedAt: nowIso }
       : undefined;
 
-    // 1. Atomically update local state first so balance reductions are immediately applied
+    // 1. Atomically update items state & localStorage immediately
     setItems((prevItems) => {
-      let nextItems = prevItems.map((i) => {
+      const nextItems = prevItems.map((i) => {
         if (i.id === stampedTarget.id) {
           return { ...i, ...stampedTarget };
         }
@@ -462,22 +501,11 @@ export default function App() {
       return nextItems;
     });
 
-    // 2. If logged in with Firestore, persist both target and source items
-    if (user) {
-      try {
-        setSyncState('syncing');
-        await saveFirestoreFinancialItem(user.uid, stampedTarget);
-        if (stampedSource) {
-          await saveFirestoreFinancialItem(user.uid, stampedSource);
-        }
-        setSyncState('synced');
-      } catch (err) {
-        console.error('Failed to sync updated items to Firestore:', err);
-        setSyncState('offline');
-      }
-    }
-
-    const txPayload: Omit<Transaction, 'id' | 'userId' | 'createdAt'> & { id?: string } = {
+    // 2. Construct & record the transaction record in local state & localStorage immediately
+    const txId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const fullTx: Transaction = {
+      id: txId,
+      userId: user ? user.uid : 'guest',
       itemId: transaction.itemId || updatedTargetItem.id,
       itemTitle: transaction.itemTitle || updatedTargetItem.title,
       itemType: transaction.itemType || updatedTargetItem.type,
@@ -487,30 +515,34 @@ export default function App() {
       country: transaction.country || updatedTargetItem.country || 'UAE',
       category: transaction.category || 'General',
       description: transaction.description || '',
-      date: transaction.date || new Date().toISOString(),
+      date: transaction.date || nowIso,
       sourceAccountId: transaction.sourceAccountId,
       sourceAccountTitle: transaction.sourceAccountTitle,
       rewardPointsUsed: transaction.rewardPointsUsed,
-      cashbackAmount: transaction.cashbackAmount
+      cashbackAmount: transaction.cashbackAmount,
+      createdAt: nowIso
     };
 
-    // 3. Save Transaction Record in Firestore / State
+    setTransactions((prevTxs) => {
+      const updatedTxs = [fullTx, ...prevTxs];
+      localStorage.setItem('finmob_local_txs', JSON.stringify(updatedTxs));
+      return updatedTxs;
+    });
+
+    // 3. Persist items and transaction to Cloud Firestore if authenticated
     if (user) {
       try {
-        await saveFirestoreTransaction(user.uid, txPayload);
-      } catch (e) {
-        console.error('Error saving transaction record:', e);
+        setSyncState('syncing');
+        await saveFirestoreFinancialItem(user.uid, stampedTarget);
+        if (stampedSource) {
+          await saveFirestoreFinancialItem(user.uid, stampedSource);
+        }
+        await saveFirestoreTransaction(user.uid, fullTx);
+        setSyncState('synced');
+      } catch (err) {
+        console.error('Failed to sync transaction to Firestore:', err);
+        setSyncState('offline');
       }
-    } else {
-      const newTx: Transaction = {
-        ...txPayload,
-        id: `tx_${Date.now()}`,
-        userId: 'guest',
-        createdAt: new Date().toISOString()
-      };
-      const updatedTxs = [newTx, ...transactions];
-      setTransactions(updatedTxs);
-      localStorage.setItem('finmob_local_txs', JSON.stringify(updatedTxs));
     }
   };
 

@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getAnalytics, isSupported as isAnalyticsSupported, Analytics } from 'firebase/analytics';
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -28,7 +29,7 @@ import {
   Firestore
 } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { getMessaging, getToken, onMessage, Messaging, isSupported } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, Messaging, isSupported as isMessagingSupported } from 'firebase/messaging';
 import appletConfig from '../../firebase-applet-config.json';
 import { FinancialItem, Transaction, UserSettings } from '../types';
 
@@ -42,7 +43,6 @@ const isCustomKeyValid =
   !envApiKey.includes('YourApiKey');
 
 // Target Firebase Project configuration (Project: finmob-7e007)
-// Uses provided environment variables if valid, otherwise falls back to active applet config
 export const firebaseConfig = {
   apiKey: isCustomKeyValid ? envApiKey : (appletConfig.apiKey || "AIzaSyCOD-r0hXW59fEM9hC-MYIPUjjLUwRFIRc"),
   authDomain: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_AUTH_DOMAIN : null) || appletConfig.authDomain || "finmob-7e007.firebaseapp.com",
@@ -50,25 +50,33 @@ export const firebaseConfig = {
   storageBucket: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_STORAGE_BUCKET : null) || appletConfig.storageBucket || "finmob-7e007.firebasestorage.app",
   messagingSenderId: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID : null) || appletConfig.messagingSenderId || "55757491863",
   appId: (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_APP_ID : null) || appletConfig.appId || "1:55757491863:web:b5540a29e8cf33289ea3d2",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || appletConfig.measurementId || ""
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || appletConfig.measurementId || "G-S6DC6C0RSB"
 };
 
 const customDatabaseId =
   (isCustomKeyValid ? import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID : null) ||
-  appletConfig.firestoreDatabaseId ||
-  undefined;
+  (appletConfig.firestoreDatabaseId && appletConfig.firestoreDatabaseId !== '(default)' && appletConfig.firestoreDatabaseId !== 'default'
+    ? appletConfig.firestoreDatabaseId
+    : undefined);
 
 // Initialize Firebase App Singleton
 export const app: FirebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
+// Initialize Firebase Analytics safely for browser
+export let analytics: Analytics | null = null;
+if (typeof window !== 'undefined') {
+  isAnalyticsSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  }).catch(() => {});
+}
+
 // Initialize Firebase Authentication
 export const auth: Auth = getAuth(app);
 
-// Initialize Cloud Firestore (supports named database e.g. "myfin" or standard default database)
-export const db: Firestore =
-  customDatabaseId && customDatabaseId !== '(default)' && customDatabaseId !== 'default'
-    ? getFirestore(app, customDatabaseId)
-    : getFirestore(app);
+// Initialize Cloud Firestore (supports standard default database or custom named database)
+export const db: Firestore = customDatabaseId ? getFirestore(app, customDatabaseId) : getFirestore(app);
 
 // Initialize Cloud Storage
 export const storage: FirebaseStorage = getStorage(app);
@@ -77,7 +85,7 @@ export const storage: FirebaseStorage = getStorage(app);
 let messagingInstance: Messaging | null = null;
 export async function getFirebaseMessaging(): Promise<Messaging | null> {
   if (typeof window === 'undefined') return null;
-  const supported = await isSupported().catch(() => false);
+  const supported = await isMessagingSupported().catch(() => false);
   if (supported && !messagingInstance) {
     messagingInstance = getMessaging(app);
   }
